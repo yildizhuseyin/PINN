@@ -4,6 +4,8 @@ from tensorflow.keras import datasets, layers, models
 from tensorflow import keras
 
 import matplotlib.pyplot as plt
+from matplotlib import cm
+
 import math
 import numpy as np
 import time as t
@@ -47,6 +49,33 @@ def plot_points(figNo,subNo,X,Y,color=None,title=None,figsize =(8, 7)):
         ax.set_ylabel('Y')
         ax.set_title(title)  
         
+def plot_surf_3D(figNo,subNo,X,Y,Z,title):
+    # bir veri grubu için yüzey çizimini yapar 
+    level=30;
+    fig = plt.figure(figNo,figsize =(8, 7))
+    ax = fig.add_subplot(subNo,projection='3d') #♦  projection='3d' 
+    levels = tf.linspace(-1, 1, level)
+    # surf=ax.contourf(X, Y, Z, rstride=1, cstride=1, cmap='autumn',
+    #     linewidth=0, antialiased=False)
+    surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm,
+                       linewidth=0, antialiased=False)
+    fig.colorbar(surf, shrink=0.5, aspect=5)
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_title(title)
+    
+def plot_surf_2D(figNo,subNo,X,Y,Z,title):
+    # bir veri grubu için yüzey çizimini yapar 
+    level=50;
+    fig = plt.figure(figNo,figsize =(8, 7))
+    ax = fig.add_subplot(subNo) #♦  projection='3d' 
+    levels = tf.linspace(-1, 1, level)
+    surf=ax.contourf(X, Y, Z, cmap='autumn', antialiased=False)
+    fig.colorbar(surf, shrink=0.5, aspect=5)
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_title(title)
+
         
 def tf_linsolve(M,B):
         B=tf.reshape(B,[-1,1])
@@ -158,6 +187,100 @@ class GEOMETRY_1D:
         plot_points(figNo,413,self.X,self.par,color,'parametre')
         plot_points(figNo,414,self.X,self.q,color,'ısı üretimi')
         
+class GEOMETRY_2D:
+    def __init__(self,Min,Max,par,q0=0,n=[10,10]): 
+        self.min=Min; # başlangıç değeri, 
+        self.max=Max; # son değer, 
+        self.n=n; # nokta sayısı 
+        tmpx=np.linspace(self.min[0],self.max[0],self.n[0])
+        tmpy=np.linspace(self.min[1],self.max[1],self.n[1])
+          
+        self.X2D,self.Y2D=np.meshgrid(tmpx,tmpy)
+        self.F2D=np.zeros_like(self.X2D)
+        self.par2D=np.ones_like(self.X2D)*par
+        self.q2D=np.ones_like(self.X2D)*q0
+        
+        self.X=np.reshape(self.X2D,[-1,1])
+        self.Y=np.reshape(self.Y2D,[-1,1])
+        
+        self.IDx=np.linspace(0,self.n[0]-1,self.n[0],dtype=np.int32)
+        self.IDy=np.linspace(0,self.n[1]-1,self.n[1],dtype=np.int32)
+        
+        say=0; 
+        self.ID1D=np.zeros([len(self.X[:,0]),2])
+        self.ID2D=np.zeros_like(self.X2D)
+        for j in self.IDy:
+            for i in self.IDx:
+                self.ID1D[say,0]=self.IDx[i]
+                self.ID1D[say,1]=self.IDy[j]
+                self.ID2D[j,i]=say
+                say+=1;
+        # self.F=np.zeros_like(self.X)
+        # self.par=np.ones_like(self.X)*par
+        # self.q=np.ones_like(self.X)*q0
+        
+    def set_function_value(self,new_value,condition,Type='f'):#lambda x: x==0    # f: func value p: parameter value 
+        # koşul yazılırken değişken x olarak girilmeli 
+        for j in self.IDy:
+            for i in self.IDx:
+                x=self.X2D[j,i]
+                y=self.Y2D[j,i]
+                if condition(x,y):
+                    print('nokta bulundu x:%d  y:%d',x,y)
+                    if Type=='f':
+                        self.F2D[j,i]=(new_value)
+                    elif Type=='q':
+                        self.q2D[j,i]=new_value
+                    elif Type=='p':
+                        self.par2D[j,i]=new_value
+                    else: 
+                        print('Hatalı işlem yaptınız')
+                        
+    def flat_to_1D(self):
+        self.F=np.reshape(self.F2D,[-1,1])
+        self.par=np.reshape(self.par2D,[-1,1])
+        self.Dpar_x=np.reshape(self.Dpar2D_x,[-1,1])
+        self.Dpar_y=np.reshape(self.Dpar2D_y,[-1,1])
+        self.q=np.reshape(self.q2D,[-1,1])
+        
+    def get_value(self,ids): 
+        
+        return [self.X[ids],self.Y[ids]],self.F[ids],self.par[ids],[self.Dpar_x[ids],self.Dpar_x[ids]],self.q[ids]
+    
+    def get_derivative_of_par(self):
+        self.derivative_of_parameters=np.zeros_like(self.X)
+        self.Dx2D=np.zeros_like(self.X2D)
+        self.Dx2D[:,1:-1]=self.X2D[:,2:]-self.X2D[:,1:-1]
+        self.Dx2D[:,0]=self.X2D[:,1]-self.X2D[:,0]
+        self.Dx2D[:,-1]=self.X2D[:,-1]-self.X2D[:,-2]
+        
+        self.Dy2D=np.zeros_like(self.Y2D)
+        self.Dy2D[1:-1,:]=self.Y2D[2:]-self.Y2D[1:-1,:]
+        self.Dy2D[0,:]=self.Y2D[1]-self.Y2D[0,:]
+        self.Dy2D[-1,:]=self.Y2D[-1,:]-self.Y2D[-2,:]
+        
+        self.Dpar2D_x=np.zeros_like(self.X2D)
+        self.Dpar2D_x[:,1:-1]=0.5*(self.par2D[:,2:]-self.par2D[:,1:-1])/(self.Dx2D[:,1:-1])+0.5*(self.par2D[:,1:-1]-self.par2D[:,0:-2])/(self.Dx2D[:,1:-1])
+        self.Dpar2D_x[:,0]=(self.par2D[:,1]-self.par2D[:,0])/self.Dx2D[:,0]
+        self.Dpar2D_x[:,-1]=(self.par2D[:,-1]-self.par2D[:,-2])/self.Dx2D[:,-1]
+        
+        self.Dpar2D_y=np.zeros_like(self.Y2D)
+        self.Dpar2D_y[1:-1,:]=0.5*(self.par2D[2:,:]-self.par2D[1:-1,:])/(self.Dy2D[1:-1,:])+0.5*(self.par2D[1:-1,:]-self.par2D[0:-2,:])/(self.Dy2D[1:-1,:])
+        self.Dpar2D_y[0,:]=(self.par2D[1,:]-self.par2D[0,:])/self.Dy2D[0,:]
+        self.Dpar2D_y[-1,:]=(self.par2D[-1,:]-self.par2D[-2,:])/self.Dy2D[-1,:]
+        self.flat_to_1D()
+        
+    def plot_function_values_2D(self,figNo,color=None):
+        plot_points(figNo,221,self.X,self.Y,'xk','noktalar')
+        plot_surf_2D(figNo,222,self.X2D,self.Y2D,self.F2D-np.ones_like(self.F2D),'funksiyon')
+        plot_surf_2D(figNo,223,self.X2D,self.Y2D,self.par2D,'parametre')
+        plot_surf_2D(figNo,224,self.X2D,self.Y2D,self.q2D,'ısı üretimi')
+    
+    def plot_function_values_3D(self,figNo,color=None):
+        plot_points(figNo,221,self.X,self.Y,'xk','noktalar')
+        plot_surf_3D(figNo,222,self.X2D,self.Y2D,self.F2D-np.ones_like(self.F2D),'funksiyon')
+        plot_surf_3D(figNo,223,self.X2D,self.Y2D,self.par2D,'parametre')
+        plot_surf_3D(figNo,224,self.X2D,self.Y2D,self.q2D,'ısı üretimi')
     
 def loss_Func( y_ref, y, err_type):
     diff= y-y_ref
