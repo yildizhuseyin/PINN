@@ -142,7 +142,50 @@ class points_1D:
         print(self.dk)
         
         
+class points_2D:
+    def __init__(self,fcn=None,color='xk'):
+
+        self.fcn=fcn
+        self.np_x=[]
+        self.np_y=[]
+        self.np_f=[]
+        self.np_k=[]
+        self.np_dk=[]
+        self.np_q=[]
+        self.color=color
+        self.point_count=0
+        self.isTensor=False
         
+    def add_points(self,x,f,k,dk,q):
+        if self.point_count==0: 
+            self.np_x=np.reshape(x[:,0], [-1,1])
+            self.np_y=np.reshape(x[:,1], [-1,1])
+            self.np_f=f
+            self.np_k=k
+            self.np_dk_dx=np.reshape(dk[:,0], [-1,1])
+            self.np_dk_dy=np.reshape(dk[:,1], [-1,1])
+            self.np_q=q
+        else: 
+            self.np_x=np.concatenate((self.np_x, np.reshape(x[:,0], [-1,1])),axis=0)
+            self.np_y=np.concatenate((self.np_y, np.reshape(x[:,1], [-1,1])),axis=0)
+            self.np_f=np.concatenate((self.np_f, f),axis=0)
+            self.np_k=np.concatenate((self.np_k, k),axis=0)
+            self.np_dk_dx=np.concatenate((self.np_dk_dx, np.reshape(dk[:,0], [-1,1])),axis=0)
+            self.np_dk_dy=np.concatenate((self.np_dk_dy, np.reshape(dk[:,1], [-1,1])),axis=0)
+            self.np_q=np.concatenate((self.np_q, q),axis=0)
+            
+        self.point_count+=len(self.np_x[:,0])
+        
+    def convert_tensor(self,dType):
+        self.X=tf.Variable(self.np_x,dtype=dType)
+        self.Y=tf.Variable(self.np_y,dtype=dType)
+        self.F=tf.convert_to_tensor(self.np_f,dtype=dType)
+        self.k=tf.convert_to_tensor(self.np_k,dtype=dType)
+        self.dk_dx=tf.convert_to_tensor(self.np_dk_dx,dtype=dType)
+        self.dk_dy=tf.convert_to_tensor(self.np_dk_dy,dtype=dType)
+        self.q=tf.convert_to_tensor(self.np_q,dtype=dType)
+        self.isTensor=True
+                
 class GEOMETRY_1D:
     def __init__(self,x_min,x_max,par,q0=0,n=10): 
         self.x_min=x_min; # başlangıç değeri, 
@@ -220,7 +263,7 @@ class GEOMETRY_2D:
         # self.q=np.ones_like(self.X)*q0
         
     def set_function_value(self,new_value,condition,Type='f'):#lambda x: x==0    # f: func value p: parameter value 
-        # koşul yazılırken değişken x olarak girilmeli 
+        # koşul yazılırken değişken x,y olarak girilmeli 
         for j in self.IDy:
             for i in self.IDx:
                 x=self.X2D[j,i]
@@ -235,17 +278,43 @@ class GEOMETRY_2D:
                         self.par2D[j,i]=new_value
                     else: 
                         print('Hatalı işlem yaptınız')
-                        
+    
+    def get_id_with_condition(self,condition):#lambda x: x==0    # f: func value p: parameter value 
+        # koşul yazılırken değişken x,y olarak girilmeli 
+        ID=[];
+        for j in self.IDy:
+            for i in self.IDx:
+                x=self.X2D[j,i]
+                y=self.Y2D[j,i]
+                if condition(x,y):
+                    ID.append([j,i])
+                    print('nokta bulundu x:%d  y:%d',x,y)
+        if ID==[]:
+            print('arama sonucu uygun bölge tespit edilemedi')
+        return np.array(ID) 
+                
     def flat_to_1D(self):
+        self.X=np.reshape(self.X2D,[-1,1])
+        self.Y=np.reshape(self.Y2D,[-1,1])
         self.F=np.reshape(self.F2D,[-1,1])
         self.par=np.reshape(self.par2D,[-1,1])
         self.Dpar_x=np.reshape(self.Dpar2D_x,[-1,1])
         self.Dpar_y=np.reshape(self.Dpar2D_y,[-1,1])
         self.q=np.reshape(self.q2D,[-1,1])
         
-    def get_value(self,ids): 
+    def get_value(self,condition): 
+        ids=self.get_id_with_condition(condition)
+        x=np.reshape(self.X2D[ids[:,0],ids[:,1]],[-1,1]);
+        y=np.reshape(self.Y2D[ids[:,0],ids[:,1]],[-1,1]);
+        F=np.reshape(self.F2D[ids[:,0],ids[:,1]],[-1,1]);
+        Par=np.reshape(self.par2D[ids[:,0],ids[:,1]],[-1,1]);
+        Dpar_x=np.reshape(self.Dpar2D_x[ids[:,0],ids[:,1]],[-1,1]);
+        Dpar_y=np.reshape(self.Dpar2D_y[ids[:,0],ids[:,1]],[-1,1]);
+        Q=np.reshape(self.q2D[ids[:,0],ids[:,1]],[-1,1]);
+        X=np.concatenate((x,y),axis=1)
+        Dpar=np.concatenate((Dpar_x,Dpar_y),axis=1)
         
-        return [self.X[ids],self.Y[ids]],self.F[ids],self.par[ids],[self.Dpar_x[ids],self.Dpar_x[ids]],self.q[ids]
+        return X,F,Par,Dpar,Q
     
     def get_derivative_of_par(self):
         self.derivative_of_parameters=np.zeros_like(self.X)
@@ -271,13 +340,13 @@ class GEOMETRY_2D:
         self.flat_to_1D()
         
     def plot_function_values_2D(self,figNo,color=None):
-        plot_points(figNo,221,self.X,self.Y,'xk','noktalar')
+        plot_points(figNo,221,self.X2D,self.Y2D,'xk','noktalar')
         plot_surf_2D(figNo,222,self.X2D,self.Y2D,self.F2D-np.ones_like(self.F2D),'funksiyon')
         plot_surf_2D(figNo,223,self.X2D,self.Y2D,self.par2D,'parametre')
         plot_surf_2D(figNo,224,self.X2D,self.Y2D,self.q2D,'ısı üretimi')
     
     def plot_function_values_3D(self,figNo,color=None):
-        plot_points(figNo,221,self.X,self.Y,'xk','noktalar')
+        plot_points(figNo,221,self.X2D,self.Y2D,'xk','noktalar')
         plot_surf_3D(figNo,222,self.X2D,self.Y2D,self.F2D-np.ones_like(self.F2D),'funksiyon')
         plot_surf_3D(figNo,223,self.X2D,self.Y2D,self.par2D,'parametre')
         plot_surf_3D(figNo,224,self.X2D,self.Y2D,self.q2D,'ısı üretimi')

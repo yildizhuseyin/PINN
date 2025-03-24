@@ -33,8 +33,14 @@ geo.get_derivative_of_par()
 
 
 # Sonlu Farklar 
-FDA=FDA_1D(geo) # klasik iterasyonlu sonlu farklar analizi 
-FDAgs=FDA_1D(geo) # gauss - sider iterasyonu sonlu farklar analizi 
+def heat_eq_1D(geo,j):
+    B=geo.Dx[j]**2/(2*geo.par[j])
+    A1=geo.par[j]/(geo.Dx[j]**2)+geo.Dpar[j]/(geo.Dx[j])
+    A2=geo.par[j]/(geo.Dx[j]**2)-geo.Dpar[j]/(geo.Dx[j])
+    new_value=B*(geo.q[j]+A1*geo.F[j+1]+A2*geo.F[j-1])
+    return new_value
+FDA=FDA_1D(geo,heat_eq_1D) # klasik iterasyonlu sonlu farklar analizi 
+FDAgs=FDA_1D(geo,heat_eq_1D) # gauss - sider iterasyonu sonlu farklar analizi 
 
 # FDA.apply_FEA(10)
 # FDA.resoult_FDA.plot_function_values(2,color='-b')
