@@ -76,6 +76,29 @@ def plot_surf_2D(figNo,subNo,X,Y,Z,title):
     ax.set_ylabel('Y')
     ax.set_title(title)
 
+def plot_stream_lines(figNo,subNo,X2D,Y2D,Z2Dx,Z2Dy,title,Type='linewith',par=0):
+    #get_ipython().run_line_magic('matplotlib', 'inline')
+    Z=np.sqrt(Z2Dx**2+Z2Dy**2)
+    #fig = plt.figure(figsize =(8, 7))
+    fig = plt.figure(figNo,figsize =(8, 7))
+    ax = fig.add_subplot(subNo) #♦  projection='3d' 
+    if Type=='linewith':
+        if par==0:
+            lw = 5*Z / Z.max()
+            strm = ax.streamplot(X2D, Y2D, Z2Dx, Z2Dy, color = Z,
+                                  linewidth = lw, cmap ='autumn')
+        else:
+            strm = ax.streamplot(X2D, Y2D, Z2Dx, Z2Dy, color = Z,
+                                  linewidth = 2, cmap ='autumn')
+    elif Type=='density':
+        if par==0:
+            par=[0.5, 1]
+        strm = ax.streamplot(X2D, Y2D, Z2Dx, Z2Dy, color = Z,
+                              density=par, cmap ='autumn')
+    fig.colorbar(strm.lines)
+    plt.tight_layout() # show plot
+    plt.xlabel('X');    plt.ylabel('Y'); plt.title(title)
+    plt.show();  
         
 def tf_linsolve(M,B):
         B=tf.reshape(B,[-1,1])
@@ -231,6 +254,7 @@ class GEOMETRY_1D:
         plot_points(figNo,414,self.X,self.q,color,'ısı üretimi')
         
 class GEOMETRY_2D:
+    rot_F=[]
     def __init__(self,Min,Max,par,q0=0,n=[10,10]): 
         self.min=Min; # başlangıç değeri, 
         self.max=Max; # son değer, 
@@ -351,6 +375,46 @@ class GEOMETRY_2D:
         plot_surf_3D(figNo,223,self.X2D,self.Y2D,self.par2D,'parametre')
         plot_surf_3D(figNo,224,self.X2D,self.Y2D,self.q2D,'ısı üretimi')
     
+    def plot_stream_line(self,figNo,subNo,title='stream line'):
+        plot_stream_lines(figNo,subNo,self.X2D,self.Y2D,self.rot_F[0],self.rot_F[1],title,Type='linewith',par=0)
+        #plot_stream_lines(figNo,subNo,self.X2D,self.Y2D,self.rot_F[0],self.rot_F[1],title,Type='density',par=0)
+    
+    def plot_magnetic_fields(self,figNo,title='title'):
+        plot_surf_2D(figNo,221,self.X2D,self.Y2D,self.rot_F[0],title)
+        plot_surf_2D(figNo,222,self.X2D,self.Y2D,self.rot_F[1],title)
+        plot_surf_2D(figNo,223,self.X2D,self.Y2D,self.rot_F[2],title)
+        
+def loss_func_with_err(e, err_type):
+    diff= e
+    if err_type=='e':
+        ress=diff
+    elif err_type=='ae':
+        ress=tf.abs(diff)
+    elif err_type=='me':
+        dist_sq = tf.square(diff)
+        ress= tf.reduce_mean(dist_sq)
+    elif err_type=='mae':
+        diff_abs=tf.abs(diff)
+        ress=tf.reduce_mean(diff_abs)
+    elif err_type=='se':
+        dist_sq = tf.square(diff)
+        ress=tf.reduce_sum(dist_sq)
+    elif err_type=='sae':
+        dist_sq = tf.square(diff)
+        ress=tf.reduce_sum(tf.abs(dist_sq))
+    elif err_type=='mse':
+        dist_sq = tf.square(diff)
+        ress=tf.reduce_mean(dist_sq)
+    elif err_type=='sse':
+        dist_sq = tf.square(diff)
+        ress=tf.reduce_sum(dist_sq)    
+    elif err_type=='rmse':
+        dist_sq = tf.square(diff)
+        mean_squared_diff= tf.reduce_mean(dist_sq)
+        ress=tf.sqrt(mean_squared_diff)
+    
+    return ress
+
 def loss_Func( y_ref, y, err_type):
     diff= y-y_ref
     if err_type=='e':
@@ -381,4 +445,7 @@ def loss_Func( y_ref, y, err_type):
         ress=tf.sqrt(mean_squared_diff)
     
     return ress
+
+
+       
        

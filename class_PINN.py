@@ -253,8 +253,9 @@ class PINN_2D:
             #     U+=tf.reshape(Fp_, U.shape)
             #     U_x +=tf.reshape(Fp_x, U_x.shape)
             #print('NN:',prediction_of_boundry.shape,'poly:',Fp.shape)
-            prediction_of_boundry=boundry_points.fcn(boundry_points,[[U],[U_x,U_y]])
-            loss_boundry=loss_Func(boundry_points.F,prediction_of_boundry,self.err_type)
+            oss_on_boundry=boundry_points.fcn(boundry_points,[[U],[U_x,U_y]])
+            #loss_boundry=loss_Func(boundry_points.F,prediction_of_boundry,self.err_type)
+            loss_boundry=loss_func_with_err(oss_on_boundry,self.err_type)
             total_loss=total_loss+loss_boundry
             del tape_u
         return total_loss
