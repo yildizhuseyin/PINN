@@ -353,14 +353,16 @@ class GEOMETRY_2D:
         self.Dy2D[-1,:]=self.Y2D[-1,:]-self.Y2D[-2,:]
         
         self.Dpar2D_x=np.zeros_like(self.X2D)
-        self.Dpar2D_x[:,1:-1]=0.5*(self.par2D[:,2:]-self.par2D[:,1:-1])/(self.Dx2D[:,1:-1])+0.5*(self.par2D[:,1:-1]-self.par2D[:,0:-2])/(self.Dx2D[:,1:-1])
-        self.Dpar2D_x[:,0]=(self.par2D[:,1]-self.par2D[:,0])/self.Dx2D[:,0]
-        self.Dpar2D_x[:,-1]=(self.par2D[:,-1]-self.par2D[:,-2])/self.Dx2D[:,-1]
+        # self.Dpar2D_x[:,1:-1]=0.5*(self.par2D[:,2:]-self.par2D[:,1:-1])/(self.Dx2D[:,1:-1])+0.5*(self.par2D[:,1:-1]-self.par2D[:,0:-2])/(self.Dx2D[:,1:-1])
+        self.Dpar2D_x[:,1:-1]=0.5*(self.par2D[:,2:]-self.par2D[:,0:-2])/(self.Dx2D[:,1:-1])
+        # self.Dpar2D_x[:,0]=(self.par2D[:,1]-self.par2D[:,0])/self.Dx2D[:,0]
+        # self.Dpar2D_x[:,-1]=(self.par2D[:,-1]-self.par2D[:,-2])/self.Dx2D[:,-1]
         
         self.Dpar2D_y=np.zeros_like(self.Y2D)
-        self.Dpar2D_y[1:-1,:]=0.5*(self.par2D[2:,:]-self.par2D[1:-1,:])/(self.Dy2D[1:-1,:])+0.5*(self.par2D[1:-1,:]-self.par2D[0:-2,:])/(self.Dy2D[1:-1,:])
-        self.Dpar2D_y[0,:]=(self.par2D[1,:]-self.par2D[0,:])/self.Dy2D[0,:]
-        self.Dpar2D_y[-1,:]=(self.par2D[-1,:]-self.par2D[-2,:])/self.Dy2D[-1,:]
+        #self.Dpar2D_y[1:-1,:]=0.5*(self.par2D[2:,:]-self.par2D[1:-1,:])/(self.Dy2D[1:-1,:])+0.5*(self.par2D[1:-1,:]-self.par2D[0:-2,:])/(self.Dy2D[1:-1,:])
+        self.Dpar2D_y[1:-1,:]=0.5*(self.par2D[2:,:]-self.par2D[0:-2,:])/(self.Dy2D[1:-1,:])
+        # self.Dpar2D_y[0,:]=(self.par2D[1,:]-self.par2D[0,:])/self.Dy2D[0,:]
+        # self.Dpar2D_y[-1,:]=(self.par2D[-1,:]-self.par2D[-2,:])/self.Dy2D[-1,:]
         self.flat_to_1D()
         
     def plot_function_values_2D(self,figNo,color=None):
