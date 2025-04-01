@@ -24,14 +24,14 @@ Ax1=0.0/Amax # C x=L boyutsuz sıcaklık
 Ay0=0.0/Amax # C x=0 boyutsuz sıcaklık     
 Ay1=0.0/Amax # C x=L boyutsuz sıcaklık    
 
-M0=Mu0/Mu0  # boyutsuz manyetik geçirgenlik 
-M1=100
+M0=Mu0#/Mu0  # boyutsuz manyetik geçirgenlik 
+M1=100*Mu0
 f0=1/M0
 f1=1/M1
-J=N*I/(Am)/Jmax; # Boyutsuz akı
+J=N*I/(Am)#/Jmax; # Boyutsuz akı
 
 # Geometri tanımlama işlemleri  
-geo=GEOMETRY_2D([0,0],[L,L],f0,n=[15,15])
+geo=GEOMETRY_2D([0,0],[L,L],f0,n=[50,50])
 # Geometriyi tanımla 
 geo.set_function_value(Ax0, lambda x,y: x==0,Type='f')
 geo.set_function_value(Ax1, lambda x,y: x==L,Type='f')
@@ -39,64 +39,77 @@ geo.set_function_value(Ay0, lambda x,y: 0<x<L and y==0,Type='f')
 geo.set_function_value(Ay1, lambda x,y: 0<x<L and y==L,Type='f')
 
 geo.set_function_value(J, lambda x,y: 0.4<=x<=0.6 and 0.4<=y<=0.6,Type='q')
-geo.set_function_value(f1, lambda x,y: 0.1<=x<=0.25 and 0.35<=y<=0.65,Type='p')
-# geo.set_function_value((f1+f0)/2, lambda x,y: x==0.1 and 0.35<=y<=0.65,Type='p')
-# geo.set_function_value((f1+f0)/2, lambda x,y: x==0.25 and 0.35<=y<=0.65,Type='p')
-# geo.set_function_value((f1+f0)/2, lambda x,y: 0.1<=x<=0.25 and y==0.35,Type='p')
-# geo.set_function_value((f1+f0)/2, lambda x,y: 0.1<=x<=0.25 and y==0.65,Type='p')
+geo_copy=geo.copy()
+
+geo.set_function_value(f1, lambda x,y: 0.1<=x<=0.30 and 0.35<=y<=0.65,Type='p')
+geo.set_function_value((f1+f0)/2, lambda x,y: x==0.1 and 0.35<=y<=0.65,Type='p')
+geo.set_function_value((f1+f0)/2, lambda x,y: x==0.30 and 0.35<=y<=0.65,Type='p')
+geo.set_function_value((f1+f0)/2, lambda x,y: 0.1<=x<=0.25 and y==0.35,Type='p')
+geo.set_function_value((f1+f0)/2, lambda x,y: 0.1<=x<=0.25 and y==0.65,Type='p')
 
 geo.get_derivative_of_par()
-geo.plot_function_values_2D(1,color='-b')
+geo_copy.get_derivative_of_par()
 
+# geo.plot_function_values_2D(1,color='-b')
+
+global pp 
+pp=1
 # Sonlu Farklar 
-def pde_heat_2D(geo,i,j): #Isı transferi için iki boyutlu sıcaklık denkleminin uygulanışı 
-    C1=(geo.Dy2D[j,i]**2)*geo.par2D[j,i]
-    C2=(geo.Dx2D[j,i]**2)*geo.par2D[j,i]
-    C3=1*(geo.Dx2D[j,i]**2)*(geo.Dy2D[j,i]**2)
-    C4=-0.5*(geo.Dx2D[j,i]**2)*(geo.Dy2D[j,i]**1)*geo.Dpar2D_x[j,i]
-    C5=0.5*(geo.Dx2D[j,i]**1)*(geo.Dy2D[j,i]**2)*geo.Dpar2D_y[j,i]
-    print(C5,C5)
+def pde_Maxwels_equation_2D(geo,i,j): #Isı transferi için iki boyutlu sıcaklık denkleminin uygulanışı 
+    global pp
+    C1=+(geo.Dy2D[j,i]**2)*geo.par2D[j,i]
+    C2=+(geo.Dx2D[j,i]**2)*geo.par2D[j,i]
+    C3=+1*(geo.Dx2D[j,i]**2)*(geo.Dy2D[j,i]**2)
+    C4=-1*0.5*(geo.Dx2D[j,i]**2)*(geo.Dy2D[j,i]**1)*geo.Dpar2D_y[j,i]
+    C5=-1*0.5*(geo.Dx2D[j,i]**1)*(geo.Dy2D[j,i]**2)*geo.Dpar2D_x[j,i]
     M=2*geo.par2D[j,i]*(geo.Dx2D[j,i]**2+geo.Dy2D[j,i]**2)
     if i==0: 
         new_temp_value=(1.0/M)*(C3*geo.q2D[j,i]
                                 +C1*geo.F2D[j,i+1]+C1*geo.F2D[j,i+1]
                                 +C2*geo.F2D[j+1,i]+C2*geo.F2D[j-1,i]
-                                +C4*geo.F2D[j+1,i]+C4*geo.F2D[j+1,i]
-                                +C5*geo.F2D[j,i+1]+C5*geo.F2D[j,i+1])
+                                +C4*geo.F2D[j+1,i]-C4*geo.F2D[j+1,i]
+                                +C5*geo.F2D[j,i+1]-C5*geo.F2D[j,i+1])
     else: 
         new_temp_value=(1.0/M)*(C3*geo.q2D[j,i]
                                 +C1*geo.F2D[j,i+1]+C1*geo.F2D[j,i-1]
                                 +C2*geo.F2D[j+1,i]+C2*geo.F2D[j-1,i]
-                                +C4*geo.F2D[j+1,i]+C4*geo.F2D[j-1,i]
-                                +C5*geo.F2D[j,i+1]+C5*geo.F2D[j,i-1])
+                                +C4*geo.F2D[j+1,i]-C4*geo.F2D[j-1,i]
+                                +C5*geo.F2D[j,i+1]-C5*geo.F2D[j,i-1])
+    #print(C5,C5,M,new_temp_value,type(new_temp_value))
     return new_temp_value
     
 
 # Aşağıda denklemlerde bir hata var gibi duruyor tekrar irdelenecek. 
-def pde_heat_2Da(geo,i,j): #Maxwell için iki boyutlu sıcaklık denkleminin uygulanışı 
-    C1=(geo.Dx2D[j,i])*(geo.Dy2D[j,i]**2)*geo.Dpar2D_x[j,i]-(geo.Dy2D[j,i]**2)*geo.par2D[j,i]
-    C2=-(geo.Dx2D[j,i]**2)*(geo.Dy2D[j,i])*geo.Dpar2D_y[j,i]-(geo.Dx2D[j,i]**2)*geo.par2D[j,i]
-    C3=-(geo.Dx2D[j,i])*(geo.Dy2D[j,i]**2)*geo.Dpar2D_x[j,i]-(geo.Dy2D[j,i]**2)*geo.par2D[j,i]
-    C4=+(geo.Dx2D[j,i]**2)*(geo.Dy2D[j,i])*geo.Dpar2D_y[j,i]-(geo.Dx2D[j,i]**2)*geo.par2D[j,i]
-    C5=2*(geo.Dx2D[j,i]**2)*(geo.Dy2D[j,i]**2)
-    M=-2*geo.par2D[j,i]*(geo.Dx2D[j,i]**2+geo.Dy2D[j,i]**2)
-    new_temp_value=(1.0/M)*(-C5*geo.q2D[j,i]
-                            +C1*geo.F2D[j,i+1]-C3*geo.F2D[j,i-1]
-                            +C2*geo.F2D[j+1,i]-C4*geo.F2D[j-1,i])
-    return new_temp_value
+# def pde_heat_2Da(geo,i,j): #Maxwell için iki boyutlu sıcaklık denkleminin uygulanışı 
+#     C1=(geo.Dx2D[j,i])*(geo.Dy2D[j,i]**2)*geo.Dpar2D_x[j,i]-(geo.Dy2D[j,i]**2)*geo.par2D[j,i]
+#     C2=-(geo.Dx2D[j,i]**2)*(geo.Dy2D[j,i])*geo.Dpar2D_y[j,i]-(geo.Dx2D[j,i]**2)*geo.par2D[j,i]
+#     C3=-(geo.Dx2D[j,i])*(geo.Dy2D[j,i]**2)*geo.Dpar2D_x[j,i]-(geo.Dy2D[j,i]**2)*geo.par2D[j,i]
+#     C4=+(geo.Dx2D[j,i]**2)*(geo.Dy2D[j,i])*geo.Dpar2D_y[j,i]-(geo.Dx2D[j,i]**2)*geo.par2D[j,i]
+#     C5=2*(geo.Dx2D[j,i]**2)*(geo.Dy2D[j,i]**2)
+#     M=-2*geo.par2D[j,i]*(geo.Dx2D[j,i]**2+geo.Dy2D[j,i]**2)
+#     new_temp_value=(1.0/M)*(-C5*geo.q2D[j,i]
+#                             +C1*geo.F2D[j,i+1]-C3*geo.F2D[j,i-1]
+#                             +C2*geo.F2D[j+1,i]-C4*geo.F2D[j-1,i])
+#     return new_temp_value
 
-# FDA=FDA_2D(geo,pde_heat_2D) # klasik iterasyonlu sonlu farklar analizi 
-# FDA.apply_FDA(50)
-# FDA.resoult_FDA.plot_function_values_2D(2,color='-b')
+FDA=FDA_2D(geo_copy,pde_Maxwels_equation_2D) # klasik iterasyonlu sonlu farklar analizi 
+FDA.apply_FDA(500)
+FDA.resoult_FDA.plot_function_values_2D(2,color='-b')
 # F2D=FDA.resoult_FDA.F2D
-# B=FDA.apply_cross_product()
+B=FDA.apply_cross_product()
+FDA.resoult_FDA.plot_stream_line(1,121)
+FDA.resoult_FDA.plot_magnetic_fields(2)
+FDA.plot_log(4,211)
 
-FDAgs=FDA_2D(geo,pde_heat_2D) # gauss - sider iterasyonu sonlu farklar analizi 
+
+FDAgs=FDA_2D(geo,pde_Maxwels_equation_2D) # gauss - sider iterasyonu sonlu farklar analizi 
+FDAgs.set_fonction_values(FDA.geo.F2D)
 # FDAgs.set_more_calculation_area('x0') # x=0 da simetri koşulu dT/dx=0 
 
-FDAgs.apply_FDA_with_gauss_sider(5500,lamda=0.25)
-FDAgs.resoult_FDA.plot_function_values_2D(3,color='-g')
-F2Dgs=FDAgs.resoult_FDA.F2D
+# FDAgs.apply_FDA(500)
+FDAgs.apply_FDA_with_gauss_sider(1500,lamda=0.01)
+# FDAgs.resoult_FDA.plot_function_values_2D(3,color='-g')
+# F2Dgs=FDAgs.resoult_FDA.F2D
 Bgs=FDAgs.apply_cross_product()
 
 
@@ -104,8 +117,9 @@ XX=FDAgs.resoult_FDA.X2D # Kontrol için x değerleri
 YY=FDAgs.resoult_FDA.Y2D # Kontrol için x değerleri 
 T_FDA=FDAgs.resoult_FDA.F2D # Sonlu farklar çözümü 
 
-FDAgs.resoult_FDA.plot_stream_line(4,111)
-FDAgs.resoult_FDA.plot_magnetic_fields(5)
+FDAgs.resoult_FDA.plot_stream_line(1,122)
+FDAgs.resoult_FDA.plot_magnetic_fields(3)
+FDAgs.plot_log(4,212)
 """
 
 # Buradan sonra Fizik bilgili sinir ağını kuruyoruz ve eğitiyoruz. 

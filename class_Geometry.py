@@ -259,6 +259,7 @@ class GEOMETRY_2D:
         self.min=Min; # başlangıç değeri, 
         self.max=Max; # son değer, 
         self.n=n; # nokta sayısı 
+        self.par_ref=par
         tmpx=np.linspace(self.min[0],self.max[0],self.n[0])
         tmpy=np.linspace(self.min[1],self.max[1],self.n[1])
           
@@ -285,7 +286,17 @@ class GEOMETRY_2D:
         # self.F=np.zeros_like(self.X)
         # self.par=np.ones_like(self.X)*par
         # self.q=np.ones_like(self.X)*q0
-        
+    def copy(self):
+        tmp_geo=GEOMETRY_2D(self.min,self.max,self.par_ref,n=self.n)
+        tmp_geo.F2D=self.F2D.copy()
+        tmp_geo.X2D=self.X2D.copy()
+        tmp_geo.Y2D=self.Y2D.copy()
+        tmp_geo.par2D=self.par2D.copy()
+        tmp_geo.q2D=self.q2D.copy()
+        tmp_geo.ID1D=self.ID1D.copy()
+        tmp_geo.ID2D=self.ID2D.copy()
+        return tmp_geo 
+    
     def set_function_value(self,new_value,condition,Type='f'):#lambda x: x==0    # f: func value p: parameter value 
         # koşul yazılırken değişken x,y olarak girilmeli 
         for j in self.IDy:
@@ -353,14 +364,16 @@ class GEOMETRY_2D:
         self.Dy2D[-1,:]=self.Y2D[-1,:]-self.Y2D[-2,:]
         
         self.Dpar2D_x=np.zeros_like(self.X2D)
-        # self.Dpar2D_x[:,1:-1]=0.5*(self.par2D[:,2:]-self.par2D[:,1:-1])/(self.Dx2D[:,1:-1])+0.5*(self.par2D[:,1:-1]-self.par2D[:,0:-2])/(self.Dx2D[:,1:-1])
-        self.Dpar2D_x[:,1:-1]=0.5*(self.par2D[:,2:]-self.par2D[:,0:-2])/(self.Dx2D[:,1:-1])
+        #self.Dpar2D_x[:,1:-1]=0.5*(self.par2D[:,2:]-self.par2D[:,1:-1])/(self.Dx2D[:,1:-1])+0.5*(self.par2D[:,1:-1]-self.par2D[:,0:-2])/(self.Dx2D[:,1:-1])
+        self.Dpar2D_x[:,1:-1]=1.0*(self.par2D[:,2:]-self.par2D[:,1:-1])/(self.Dx2D[:,1:-1])
+        #self.Dpar2D_x[:,1:-1]=0.5*(self.par2D[:,2:]-self.par2D[:,0:-2])/(self.Dx2D[:,1:-1])
         # self.Dpar2D_x[:,0]=(self.par2D[:,1]-self.par2D[:,0])/self.Dx2D[:,0]
         # self.Dpar2D_x[:,-1]=(self.par2D[:,-1]-self.par2D[:,-2])/self.Dx2D[:,-1]
         
         self.Dpar2D_y=np.zeros_like(self.Y2D)
         #self.Dpar2D_y[1:-1,:]=0.5*(self.par2D[2:,:]-self.par2D[1:-1,:])/(self.Dy2D[1:-1,:])+0.5*(self.par2D[1:-1,:]-self.par2D[0:-2,:])/(self.Dy2D[1:-1,:])
-        self.Dpar2D_y[1:-1,:]=0.5*(self.par2D[2:,:]-self.par2D[0:-2,:])/(self.Dy2D[1:-1,:])
+        self.Dpar2D_y[1:-1,:]=1.0*(self.par2D[2:,:]-self.par2D[1:-1,:])/(self.Dy2D[1:-1,:])
+        #self.Dpar2D_y[1:-1,:]=0.5*(self.par2D[2:,:]-self.par2D[0:-2,:])/(self.Dy2D[1:-1,:])
         # self.Dpar2D_y[0,:]=(self.par2D[1,:]-self.par2D[0,:])/self.Dy2D[0,:]
         # self.Dpar2D_y[-1,:]=(self.par2D[-1,:]-self.par2D[-2,:])/self.Dy2D[-1,:]
         self.flat_to_1D()

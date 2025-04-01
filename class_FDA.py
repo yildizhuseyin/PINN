@@ -64,6 +64,8 @@ class FDA_2D:
         self.geo=Geo
         self.fcn=fonc
         self.update_ids=np.array(ids)
+        self.log=[]
+        self.iter=0
     def set_more_calculation_area(self,axis):
         if axis=='x0': 
             self.update_ids[0,0]=0;
@@ -75,7 +77,12 @@ class FDA_2D:
             self.update_ids[1,1]=len(geo.IDy[:])+1;
         else: 
             print('Hatalı giriş')
-        
+    
+    def set_fonction_values(self,F):
+        if shape(self.geo.F2D)==shape(F):
+            self.geo.F2D=F
+        else: 
+            print('veri boyutu hatalı ')
     def apply_FDA(self,epoch,err_lim=1e-3):
         geo=self.geo
         self.t0=t.time()
@@ -87,6 +94,9 @@ class FDA_2D:
                     geo.F2D[j,i]
             errs=np.abs(tmpF2D-geo.F2D)
             mean_err=np.mean(errs)
+            iter_time=t.time()-self.t0
+            self.log.append([self.iter,iter_time,mean_err])
+            self.iter+=1
         self.SIM_time=t.time()-self.t0
         print('clasical FDA simulation time : ',self.SIM_time)
         self.resoult_FDA=geo
@@ -103,9 +113,16 @@ class FDA_2D:
                     geo.F2D[j,i]=(lamda*newF2D[j,i]+(1-lamda)*tmpF2D[j,i])
             errs=np.abs(tmpF2D-geo.F2D)
             mean_err=np.mean(errs)
+            iter_time=t.time()-self.t0
+            self.log.append([self.iter,iter_time,mean_err])
+            self.iter+=1
         self.SIM_time=t.time()-self.t0
         print('gauss-sider FDA simulation time : ',self.SIM_time)
         self.resoult_FDA=geo
+    
+    def plot_log(self,figNo,SubNo):
+        self.np_log=np.array(self.log)
+        plot_points(figNo,SubNo,self.np_log[:,0],self.np_log[:,2],'-k','log')
     
     def apply_cross_product(self):
         Bx=np.zeros_like(self.geo.F2D)
