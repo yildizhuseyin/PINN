@@ -11,7 +11,7 @@ class Poly_2D:
     x,y,n,m= symbols('x y n m')
     e=2.718281828459045;
     Type=None
-    def __init__(self,n=[2,2],dtype=tf.float32): # Baz fonksiyonunu tanımla 
+    def __init__(self,n=[2,2],dtype=tf.float64): # Baz fonksiyonunu tanımla 
         self.Type='poly'
         self.nn=n;
         self.dtype=dtype
@@ -106,7 +106,13 @@ class RBF_function_2D:
     x,y,xk,yk,ex,ey= symbols('x y xk yk ex ey')
     e=2.718281828459045;
     Type=None
-    def __init__(self,Type): # Baz fonksiyonunu tanımla 
+    def __init__(self,dtype=tf.float64): # Baz fonksiyonunu tanımla 
+        self.color='or'
+        self.number_of_center_points=0;
+        self.set_function_type()
+        self.dtype=dtype
+        
+    def set_function_type(self,Type='gauss'):
         self.Type=Type
         if Type=='gauss':
             F=self.rbf_gauss(self.x, self.y, self.xk, self.yk, self.ex, self.ey)
@@ -118,20 +124,17 @@ class RBF_function_2D:
             F=self.rbf_InverseMultiQuadric(self.x, self.y, self.xk, self.yk, self.ex, self.ey)    
         elif Type=='eUzal':
             F=self.rbf_eUzal(self.x, self.y, self.xk, self.yk, self.ex, self.ey)
-
-            
         self.Fcn=F    
         print(self.Fcn)        
-        self.tf_F=lambdify([self.x,self.y,self.xk,self.yk,self.ex,self.ey], self.Fcn, "tensorflow")
-        self.tf_Fx=lambdify([self.x,self.y,self.xk,self.yk,self.ex,self.ey], diff(self.Fcn,self.x), "tensorflow")
-        self.tf_Fy=lambdify([self.x,self.y,self.xk,self.yk,self.ex,self.ey], diff(self.Fcn,self.y), "tensorflow")
-        self.tf_Fxx=lambdify([self.x,self.y,self.xk,self.yk,self.ex,self.ey], diff(self.Fcn,self.x,self.x), "tensorflow")
-        self.tf_Fxy=lambdify([self.x,self.y,self.xk,self.yk,self.ex,self.ey], diff(self.Fcn,self.x,self.y), "tensorflow")
-        self.tf_Fyy=lambdify([self.x,self.y,self.xk,self.yk,self.ex,self.ey], diff(self.Fcn,self.y,self.y), "tensorflow")
-            
-    
+        self.tf_P=lambdify([self.x,self.y,self.xk,self.yk,self.ex,self.ey], self.Fcn, "tensorflow")
+        self.tf_Px=lambdify([self.x,self.y,self.xk,self.yk,self.ex,self.ey], diff(self.Fcn,self.x), "tensorflow")
+        self.tf_Py=lambdify([self.x,self.y,self.xk,self.yk,self.ex,self.ey], diff(self.Fcn,self.y), "tensorflow")
+        self.tf_Pxx=lambdify([self.x,self.y,self.xk,self.yk,self.ex,self.ey], diff(self.Fcn,self.x,self.x), "tensorflow")
+        self.tf_Pxy=lambdify([self.x,self.y,self.xk,self.yk,self.ex,self.ey], diff(self.Fcn,self.x,self.y), "tensorflow")
+        self.tf_Pyy=lambdify([self.x,self.y,self.xk,self.yk,self.ex,self.ey], diff(self.Fcn,self.y,self.y), "tensorflow")
+        
+        
     def rbf_gauss(self, x, y, xm, ym, ex, ey):
-       
         Fx=exp(-(ex*ex)*((x-xm)**2)) 
         Fy=exp(-(ey*ey)*((y-ym)**2)) 
         return Fx*Fy
@@ -156,6 +159,65 @@ class RBF_function_2D:
         Fy = 1+(y-ym)**2
         return 1/Fx*Fy
         
+    def add_center_points(self,xm,ym,ex,ey,c=tf.zeros([1,1])):
+        if self.number_of_center_points==0: 
+            self.Xm=tf.reshape(xm,[1,-1]);         self.Ym=tf.reshape(ym,[1,-1])
+            self.Ex=tf.reshape(ex,[1,-1]);         self.Ey=tf.reshape(ey,[1,-1]);
+            self.C=tf.reshape(c,[-1,1]);
+            
+        else:
+            self.Xm=tf.concat((self.Xm,tf.reshape(xm,[1,-1])),axis=1)
+            self.Ym=tf.concat((self.Ym,tf.reshape(ym,[1,-1])),axis=1)
+            self.Ex=tf.concat((self.Ex,tf.reshape(ex,[1,-1])),axis=1)
+            self.Ey=tf.concat((self.Ey,tf.reshape(ey,[1,-1])),axis=1)
+            self.C=tf.concat((self.C,tf.reshape(c,[-1,1])),axis=0)
+        self.Xm=tf.cast(self.Xm,dtype=self.dtype)
+        self.Ym=tf.cast(self.Ym,dtype=self.dtype)
+        self.Ex=tf.cast(self.Ex,dtype=self.dtype)
+        self.Ey=tf.cast(self.Ey,dtype=self.dtype)
+        self.C=tf.cast(self.C,dtype=self.dtype)
+
+        self.Ir=tf.ones_like(self.Xm)
+        self.number_of_center_points=len(self.Xm[:,0].numpy())
+                
+    def get_matrix(self,x,y,der='f'):
+        # x=tf.reshape(x, [-1,1])
+        # y=tf.reshape(y, [-1,1])
+        IIc=np.ones_like(x.numpy())
+        Ic=tf.convert_to_tensor(IIc)
+        X=x*self.Ir;          Y=y*self.Ir
+        Xm=Ic*self.Xm;        Ym=Ic*self.Ym
+        Ex=Ic*self.Ex;        Ey=Ic*self.Ey
+        if der=='f':
+            M=self.tf_P(X,Y,Xm,Ym,Ex,Ey)
+        elif der=='fx':
+            M=self.tf_Px(X,Y,Xm,Ym,Ex,Ey)
+        elif der=='fy':
+            M=self.tf_Py(X,Y,Xm,Ym,Ex,Ey)
+        elif der=='fxy':
+            M=self.tf_Pxy(X,Y,Xm,Ym,Ex,Ey)
+        elif der=='fxx':
+            M=self.tf_Pxx(X,Y,Xm,Ym,Ex,Ey)
+        elif der=='fyy':
+            M=self.tf_Pyy(X,Y,Xm,Ym,Ex,Ey)
+        return M
+    
+    def model(self,x,y,der='f'):
+        M=self.get_matrix(x,y,der)
+        F=tf.matmul(M, self.C)
+        return F 
+    
+    def predict(self,x,y,der='f'):
+        shapeX=x.shape
+        np_X=np.reshape(x,[-1,1])
+        np_Y=np.reshape(y,[-1,1])
+        X=tf.convert_to_tensor(np_X)
+        Y=tf.convert_to_tensor(np_Y)
+        F=self.model(X,Y,der)
+        np_f=np.reshape(F.numpy(),shapeX)
+        return np_f
+
+    
 def fcn_boundry_example(geo,model):  # x=L, y=0, y=L ==> T=0 
     Matrix=model.get_matrix(geo.X,geo.Y,der='f')
     Resoults=geo.F
@@ -168,6 +230,8 @@ def fcn_PDE_example(geo,model): # U=[[U],[dU/dx,dU/dy], [d2U/dx2,d2U/dxdy,d2U/dy
     Resoults=geo.q
     return Matrix,Resoults
 
+
+
 class collocation_2D: 
     x,y,n,m= symbols('x y n m')
     e=2.718281828459045;
@@ -177,7 +241,7 @@ class collocation_2D:
         if self.Type=='poly':
             self.FCN=Poly_2D(n=par,dtype=dtype)
         elif self.Type=='rbf': 
-            self.FCN=RBF_function_2D()
+            self.FCN=RBF_function_2D(dtype=dtype)
         
         self.dtype=dtype
         self.list_of_boundry_geometry=[]
@@ -204,7 +268,17 @@ class collocation_2D:
         self.number_of_body_geometry+=1
         print('govde/body noktaları eklendi')
     
+    def RBF_add_center_point_with_points(self,xm,ym,ex,ey):# Gövde üzerindeki noktaları merkez nokta olarak ekle 
+        if self.Type=='rbf':    
+            self.FCN.add_center_points(xm, ym, ex, ey)
+            print('RBF model / merkez noktaları eklendi')
+        
     
+    def RBF_add_center_point_with_geo(self,geo,condition,par=1.0):# Gövde üzerindeki noktaları merkez nokta olarak ekle 
+        xm,ym,dx,dy=geo.get_geometric_value(condition)
+        self.FCN.add_center_points(xm, ym, par/dx, par/dy)
+        print('RBF model / merkez noktaları eklendi')
+        
     def apply_collocation(self):
         say=0; 
         for bp in self.list_of_boundry_geometry:
@@ -254,16 +328,20 @@ class collocation_2D:
         
     def plot_points_values_2D(self,figNo,subNo, color=None):
         plot_list=[]
+        if self.Type=='rbf':
+            plot_list.append((self.FCN.Xm.numpy(),self.FCN.Ym.numpy(),self.FCN.color))
+            
         for bp in self.list_of_boundry_geometry: 
             plot_list.append((bp.np_x,bp.np_y,bp.color))
         for bp in self.list_of_body_geometry: 
             plot_list.append((bp.np_x,bp.np_y,bp.color))
-
+        
+        
         plot_list_points(figNo,subNo,plot_list,'noktalar')
     
     def plot_curl_2D(self,figNo,x2D,y2D,color=None):
         B=self.apply_curl(x2D,y2D)
         self.plot_points_values_2D(figNo,224)
-        plot_surf_2D(figNo,223,x2D,y2D,B[2],'funksiyon')
+        plot_surf_2D(figNo,223,x2D,y2D,B[2],'|B|')
         plot_surf_2D(figNo,221,x2D,y2D,B[0],'Bx')
         plot_surf_2D(figNo,222,x2D,y2D,B[1],'By')

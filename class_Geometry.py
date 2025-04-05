@@ -229,7 +229,7 @@ class GEOMETRY_1D:
         for i in range(len(self.X)):
             x=self.X[i]
             if condition(x):
-                print('nokta bulundu',x)
+                #('nokta bulundu',x)
                 if Type=='f':
                     self.F[i]=(new_value)
                 elif Type=='q':
@@ -310,7 +310,7 @@ class GEOMETRY_2D:
                 x=self.X2D[j,i]
                 y=self.Y2D[j,i]
                 if condition(x,y):
-                    print('nokta bulundu x:%d  y:%d',x,y)
+                    #print('nokta bulundu x:%d  y:%d',x,y)
                     if Type=='f':
                         self.F2D[j,i]=(new_value)
                     elif Type=='q':
@@ -329,7 +329,7 @@ class GEOMETRY_2D:
                 y=self.Y2D[j,i]
                 if condition(x,y):
                     ID.append([j,i])
-                    print('nokta bulundu x:%d  y:%d',x,y)
+                    #print('nokta bulundu x:%d  y:%d',x,y)
         if ID==[]:
             print('arama sonucu uygun bölge tespit edilemedi')
         return np.array(ID) 
@@ -357,6 +357,16 @@ class GEOMETRY_2D:
         
         return X,F,Par,Dpar,Q
     
+    def get_geometric_value(self,condition): 
+        ids=self.get_id_with_condition(condition)
+        x=np.reshape(self.X2D[ids[:,0],ids[:,1]],[-1,1]);
+        y=np.reshape(self.Y2D[ids[:,0],ids[:,1]],[-1,1]);
+        D_x=np.reshape(self.Dx2D[ids[:,0],ids[:,1]],[-1,1]);
+        D_y=np.reshape(self.Dy2D[ids[:,0],ids[:,1]],[-1,1]);
+        # X=np.concatenate((x,y),axis=1)
+        # DX=np.concatenate((D_x,D_y),axis=1)
+        return x,y,D_x,D_y
+    
     def get_derivative_of_par(self):
         self.derivative_of_parameters=np.zeros_like(self.X)
         self.Dx2D=np.zeros_like(self.X2D)
@@ -370,15 +380,15 @@ class GEOMETRY_2D:
         self.Dy2D[-1,:]=self.Y2D[-1,:]-self.Y2D[-2,:]
         
         self.Dpar2D_x=np.zeros_like(self.X2D)
-        #self.Dpar2D_x[:,1:-1]=0.5*(self.par2D[:,2:]-self.par2D[:,1:-1])/(self.Dx2D[:,1:-1])+0.5*(self.par2D[:,1:-1]-self.par2D[:,0:-2])/(self.Dx2D[:,1:-1])
-        self.Dpar2D_x[:,1:-1]=1.0*(self.par2D[:,2:]-self.par2D[:,1:-1])/(self.Dx2D[:,1:-1])
+        self.Dpar2D_x[:,1:-1]=0.5*(self.par2D[:,2:]-self.par2D[:,1:-1])/(self.Dx2D[:,1:-1])+0.5*(self.par2D[:,1:-1]-self.par2D[:,0:-2])/(self.Dx2D[:,1:-1])
+        # self.Dpar2D_x[:,1:-1]=1.0*(self.par2D[:,2:]-self.par2D[:,1:-1])/(self.Dx2D[:,1:-1])
         #self.Dpar2D_x[:,1:-1]=0.5*(self.par2D[:,2:]-self.par2D[:,0:-2])/(self.Dx2D[:,1:-1])
         # self.Dpar2D_x[:,0]=(self.par2D[:,1]-self.par2D[:,0])/self.Dx2D[:,0]
         # self.Dpar2D_x[:,-1]=(self.par2D[:,-1]-self.par2D[:,-2])/self.Dx2D[:,-1]
         
         self.Dpar2D_y=np.zeros_like(self.Y2D)
-        #self.Dpar2D_y[1:-1,:]=0.5*(self.par2D[2:,:]-self.par2D[1:-1,:])/(self.Dy2D[1:-1,:])+0.5*(self.par2D[1:-1,:]-self.par2D[0:-2,:])/(self.Dy2D[1:-1,:])
-        self.Dpar2D_y[1:-1,:]=1.0*(self.par2D[2:,:]-self.par2D[1:-1,:])/(self.Dy2D[1:-1,:])
+        self.Dpar2D_y[1:-1,:]=0.5*(self.par2D[2:,:]-self.par2D[1:-1,:])/(self.Dy2D[1:-1,:])+0.5*(self.par2D[1:-1,:]-self.par2D[0:-2,:])/(self.Dy2D[1:-1,:])
+        # self.Dpar2D_y[1:-1,:]=1.0*(self.par2D[2:,:]-self.par2D[1:-1,:])/(self.Dy2D[1:-1,:])
         #self.Dpar2D_y[1:-1,:]=0.5*(self.par2D[2:,:]-self.par2D[0:-2,:])/(self.Dy2D[1:-1,:])
         # self.Dpar2D_y[0,:]=(self.par2D[1,:]-self.par2D[0,:])/self.Dy2D[0,:]
         # self.Dpar2D_y[-1,:]=(self.par2D[-1,:]-self.par2D[-2,:])/self.Dy2D[-1,:]
@@ -404,9 +414,9 @@ class GEOMETRY_2D:
         #plot_stream_lines(figNo,subNo,self.X2D,self.Y2D,self.rot_F[0],self.rot_F[1],title,Type='density',par=0)
     
     def plot_magnetic_fields(self,figNo,title='title'):
-        plot_surf_2D(figNo,221,self.X2D,self.Y2D,self.rot_F[0],title)
-        plot_surf_2D(figNo,222,self.X2D,self.Y2D,self.rot_F[1],title)
-        plot_surf_2D(figNo,223,self.X2D,self.Y2D,self.rot_F[2],title)
+        plot_surf_2D(figNo,221,self.X2D,self.Y2D,self.rot_F[0],'Bx')
+        plot_surf_2D(figNo,222,self.X2D,self.Y2D,self.rot_F[1],'By')
+        plot_surf_2D(figNo,223,self.X2D,self.Y2D,self.rot_F[2],'|B|')
         
 def loss_func_with_err(e, err_type):
     diff= e
