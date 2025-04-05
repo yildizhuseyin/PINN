@@ -94,21 +94,22 @@ T_FDA=FDAgs.resoult_FDA.F2D # Sonlu farklar çözümü
 
 FDAgs.resoult_FDA.plot_stream_line(4,111)
 FDAgs.resoult_FDA.plot_magnetic_fields(5)
-"""
+
 
 # Buradan sonra Fizik bilgili sinir ağını kuruyoruz ve eğitiyoruz. 
 PINN=PINN_2D() 
 # https://keras.io/api/layers/initializers/
 # random_normal   random_uniform    zeros    RandomUniform(minval=0.0, maxval=1.0)
-inis=keras.initializers.RandomUniform(minval=0.00, maxval=0.4, seed=None)
+inis=keras.initializers.RandomUniform(minval=0.00, maxval=0.1, seed=None)
+# inis=keras.initializers.RandomNormal(mean=0.0, stddev=0.5, seed=None)
 
 PINN.model.add(layers.Dense(5, activation='tanh',kernel_initializer=inis, input_shape=(2,)))
 
-PINN.model.add(layers.Dense(10, activation='tanh',kernel_initializer=inis))
-PINN.model.add(layers.Dense(25, activation='tanh',kernel_initializer=inis))
-PINN.model.add(layers.Dense(25, activation='tanh',kernel_initializer=inis))
+PINN.model.add(layers.Dense(5, activation='sigmoid',kernel_initializer=inis))
+# PINN.model.add(layers.Dense(10, activation='tanh',kernel_initializer=inis))
+# PINN.model.add(layers.Dense(25, activation='tanh',kernel_initializer=inis))
 
-PINN.model.add(layers.Dense(10, activation='tanh',kernel_initializer=inis))
+PINN.model.add(layers.Dense(5, activation='tanh',kernel_initializer=inis))
 
 # PINN.model.add(layers.Dense(5, activation='tanh',kernel_initializer=inis))
 
@@ -126,12 +127,19 @@ len(PINN.model.trainable_variables)
 def fcn_boundry(geo,U):  # x=L, y=0, y=L ==> T=0 
     # T(x,y)
     values=U[0][0]# fonksiyonun değeri/ the value of the function
-    err=geo.F-values
+    err=tf.zeros_like(geo.F)-values
     return err
 
 def fcn_PDE(geo,U): # U=[[U],[dU/dx,dU/dy], [d2U/dx2,d2U/dxdy,d2U/dy2]]
     #pde=dk_dx*Ux+dk_dy*Uy+k*(Uxx+Uyy)
-    PDE_loss=(geo.dk_dx*U[1][0]+geo.dk_dy*U[1][1])+geo.k*(U[2][0]+U[2][2]) # Diferansiyel denklem / Differential equation 
+    #PDE_loss=(geo.dk_dx*U[1][0]+geo.dk_dy*U[1][1])+geo.k*(U[2][0]+U[2][2])
+    PDE_loss=geo.q+geo.k*(U[2][0]+U[2][2]) # Diferansiyel denklem / Differential equation 
+    # a=U[0][0].numpy()
+    # ax=U[1][0].numpy()
+    # ay=U[1][1].numpy()
+    # axx=U[2][0].numpy()
+    # axy=U[2][1].numpy()
+    # ayy=U[2][2].numpy()
     return PDE_loss
 
 # Sınır koşullarını belirle 
@@ -151,24 +159,30 @@ cond_body=lambda x,y: x>0 and x<L and y>0 and y<L
 PINN.add_body(geo,fcn_PDE,cond_body) # y=L için bütün noktalar 
 print('body x',PINN.body_points.np_x)
 
-PINN.plot_points_values_2D(4,221)
+PINN.plot_points_values_2D(7,221)
 
 T_0=PINN.predict(XX,YY) # Eğitim öncesi sıcaklıklar değerlerini getir 
 
-PINN.train(1500,lr=0.001,c=[0.5,0.5],num=100,usePoly=False,errType='rmse') # 100 iterasyon koşur 
-PINN.train(1500,lr=0.001,c=[0.5,0.5],num=100,usePoly=False,errType='rmse') # 100 iterasyon koşur 
+PINN.train(1000,lr=0.01,c=[0.5,0.5],num=10,usePoly=False,errType='sse') # 100 iterasyon koşur 
+
+PINN.train(1000,lr=0.01,c=[0.5,0.5],num=10,usePoly=False,errType='mse') # 100 iterasyon koşur 
+PINN.train(1000,lr=0.001,c=[0.5,0.5],num=50,usePoly=False,errType='mse') # 100 iterasyon koşur 
+
+# PINN.train(500,lr=0.001,c=[0.5,0.5],num=100,usePoly=False,errType='mse') # 100 iterasyon koşur 
+# PINN.train(1500,lr=0.001,c=[0.5,0.5],num=100,usePoly=False,errType='rmse') # 100 iterasyon koşur 
 # PINN.train(1500,lr=0.0001,c=[0.5,0.5],num=100,usePoly=False,errType='mse') # 100 iterasyon koşur 
 
 T_1=PINN.predict(XX,YY) # Eğitim sonrası sıcaklık değerlerini getir 
+B=PINN.apply_curl(XX,YY) # Eğitim sonrası sıcaklık değerlerini getir 
+PINN.plot_stream_line(5,133,XX,YY)
 w_1=PINN.model.get_weights()
 
-plot_surf_2D(4,222,XX,YY,T_FDA,'FDA')
-plot_surf_2D(4,223,XX,YY,T_0,'first PINN')
-plot_surf_2D(4,224,XX,YY,T_1,'last PINN')
+plot_surf_2D(7,222,XX,YY,T_FDA,'FDA')
+plot_surf_2D(7,223,XX,YY,T_0,'first PINN')
+plot_surf_2D(7,224,XX,YY,T_1,'last PINN')
 
-plot_surf_3D(5,222,XX,YY,T_FDA,'FDA')
-plot_surf_3D(5,223,XX,YY,T_0,'first PINN')
-plot_surf_3D(5,224,XX,YY,T_1,'last PINN')
+plot_surf_3D(8,222,XX,YY,T_FDA,'FDA')
+plot_surf_3D(8,223,XX,YY,T_0,'first PINN')
+plot_surf_3D(8,224,XX,YY,T_1,'last PINN')
 
-PINN.plot_log(6)
-"""
+PINN.plot_log(9)

@@ -1,4 +1,5 @@
 from class_Collocation import *
+from class_Geometry import *
 
 def exmple_function_for_boundry(geo,U): 
     values=U[0]# fonksiyonun değeri/ the value of the function
@@ -312,9 +313,9 @@ class PINN_2D:
         for w in parameters:
             if use:
                 random_par = tf.random.uniform(shape=w.shape, 
-                                               minval=0, maxval=1.4, dtype=self.model.dtype)
+                                               minval=0, maxval=1.0, dtype=self.model.dtype)
                 random_par=tf.cast(random_par, self.model.dtype)
-                random_par=tf.round(random_par,0)
+                #random_par=tf.round(random_par,0)
             else: 
                 random_par=tf.ones_like(w)
             par_list.append(random_par*w)
@@ -334,7 +335,7 @@ class PINN_2D:
                 
 
         optimizer=tf.optimizers.Adam(learning_rate =lr, 
-                             beta_1 = 0.75, beta_2 = 0.99, epsilon = 1e-8)
+                             beta_1 = 0.75, beta_2 = 0.999, epsilon = 1e-8)
         
         trainable_variables = self.model.trainable_variables
         np_variables = [v.numpy() for v in trainable_variables]
@@ -346,8 +347,8 @@ class PINN_2D:
                 loss_body=self.get_body_loss()
                 loss=c[0]*loss_boundry+c[1]*loss_body
             dW=tape.gradient(loss, self.model.trainable_variables)
-            # ddW=self.get_random_parameters(dW)
-            optimizer.apply_gradients(zip(dW, self.model.trainable_variables))
+            ddW=self.get_random_parameters(dW)
+            optimizer.apply_gradients(zip(ddW, self.model.trainable_variables))
             #np_variables2 = [v.numpy() for v in trainable_variables]
             self.log[i,:]=[i,loss_boundry[0].numpy(),loss_body[0].numpy(),loss[0].numpy()]
             if i % num==0 or i<10: 
@@ -374,11 +375,36 @@ class PINN_2D:
         #     #print('pred:',prediction)
         prediction2D=np.reshape(prediction,shape_X)
         return prediction2D
+    
+    def apply_curl(self,np_x,np_y):
+        shapeX=np_x.shape 
+        np_X=np.reshape(np_x,[-1,1])
+        np_Y=np.reshape(np_y,[-1,1])
+        X=tf.convert_to_tensor(np_X)
+        Y=tf.convert_to_tensor(np_Y)
+        X=tf.Variable(X)
+        Y=tf.Variable(Y)
+        with tf.GradientTape(persistent=True) as tape_u:
+            r=tf.concat((X,Y), axis=1)
+            U = self.model(r,training=True)
+            U_x = tape_u.gradient(U, X)
+            U_y = tape_u.gradient(U, Y)
+            U_xx = tape_u.gradient(U_x, X)
+            U_xy = tape_u.gradient(U_x, Y)
+            U_yy = tape_u.gradient(U_y, Y)
+        np_vector=[np.reshape(U_y.numpy(),shapeX),
+                   np.reshape(-U_x.numpy(),shapeX),
+                   np.reshape(tf.sqrt((U_x**2+U_y**2)).numpy(),shapeX)]
+        return np_vector
+    
     def plot_log(self,figNo): 
         plot_points(figNo,311,self.log[:,0],self.log[:,3],title='total loss')
         plot_points(figNo,312,self.log[:,0],self.log[:,1],title='boundry loss')
         plot_points(figNo,313,self.log[:,0],self.log[:,2],title='body loss')
         
+    def plot_stream_line(self,figNo,subNo,X2D,Y2D,title='stream line'):
+        B=self.apply_curl(X2D,Y2D)
+        plot_stream_lines(figNo,subNo,X2D,Y2D,B[0],B[1],title)
         
     def plot_points_values_2D(self,figNo,subNo, color=None):
         plot_list=[]

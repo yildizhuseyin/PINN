@@ -76,7 +76,7 @@ def plot_surf_2D(figNo,subNo,X,Y,Z,title):
     ax.set_ylabel('Y')
     ax.set_title(title)
 
-def plot_stream_lines(figNo,subNo,X2D,Y2D,Z2Dx,Z2Dy,title,Type='linewith',par=0):
+def plot_stream_lines(figNo,subNo,X2D,Y2D,Z2Dx,Z2Dy,title='stream line',Type='linewith',par=0):
     #get_ipython().run_line_magic('matplotlib', 'inline')
     Z=np.sqrt(Z2Dx**2+Z2Dy**2)
     #fig = plt.figure(figsize =(8, 7))
@@ -167,8 +167,14 @@ class points_1D:
         
 class points_2D:
     def __init__(self,fcn=None,color='xk'):
-
-        self.fcn=fcn
+        
+        if not type(fcn)==type([]):
+            self.fcn=fcn
+            self.fcn_m=fcn
+        else: 
+            self.fcn=fcn[0]
+            self.fcn_m=fcn[1]
+            
         self.np_x=[]
         self.np_y=[]
         self.np_f=[]
@@ -377,7 +383,10 @@ class GEOMETRY_2D:
         # self.Dpar2D_y[0,:]=(self.par2D[1,:]-self.par2D[0,:])/self.Dy2D[0,:]
         # self.Dpar2D_y[-1,:]=(self.par2D[-1,:]-self.par2D[-2,:])/self.Dy2D[-1,:]
         self.flat_to_1D()
-        
+    
+    def plot_function_2D(self,figNo,subNo,color=None):
+        plot_surf_2D(figNo,subNo,self.X2D,self.Y2D,self.F2D,'function')
+    
     def plot_function_values_2D(self,figNo,color=None):
         plot_points(figNo,221,self.X2D,self.Y2D,'xk','noktalar')
         plot_surf_2D(figNo,222,self.X2D,self.Y2D,self.F2D-np.ones_like(self.F2D),'funksiyon')
