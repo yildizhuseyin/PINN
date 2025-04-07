@@ -252,6 +252,8 @@ plot_surf_3D(8,223,XX,YY,T_0,'first PINN')
 plot_surf_3D(8,224,XX,YY,T_1,'last PINN')
 
 PINN.plot_log(9)
+
+
 """
 
 """

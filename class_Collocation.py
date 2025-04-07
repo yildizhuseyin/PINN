@@ -6,6 +6,7 @@ Created on Sat Apr  5 00:07:33 2025
 """
 from class_Geometry import *
 
+import cv2
 
 class Poly_2D: 
     x,y,n,m= symbols('x y n m')
@@ -111,6 +112,7 @@ class RBF_function_2D:
         self.number_of_center_points=0;
         self.set_function_type()
         self.dtype=dtype
+        self.trainable_variables=[]
         
     def set_function_type(self,Type='gauss'):
         self.Type=Type
@@ -125,7 +127,7 @@ class RBF_function_2D:
         elif Type=='eUzal':
             F=self.rbf_eUzal(self.x, self.y, self.xk, self.yk, self.ex, self.ey)
         self.Fcn=F    
-        print(self.Fcn)        
+        print(self.Type,'\n',self.Fcn)        
         self.tf_P=lambdify([self.x,self.y,self.xk,self.yk,self.ex,self.ey], self.Fcn, "tensorflow")
         self.tf_Px=lambdify([self.x,self.y,self.xk,self.yk,self.ex,self.ey], diff(self.Fcn,self.x), "tensorflow")
         self.tf_Py=lambdify([self.x,self.y,self.xk,self.yk,self.ex,self.ey], diff(self.Fcn,self.y), "tensorflow")
@@ -147,19 +149,22 @@ class RBF_function_2D:
     def rbf_InverseQuadratic(self, x, y, xm, ym, ex, ey):    
         Fx=(1+(ex*ex)*(x-xm))**2
         Fy=(1+(ey*ey)*(y-ym))**2
-        return 1/Fx*Fy
+        return 1/(Fx*Fy)
 
     def rbf_InverseMultiQuadric(self, x, y, xm, ym, ex, ey):# Inverse multiquadric formunda baz fonksiyon 
         Fx=((1+(ex*ex)*(x-xm))**2)**0.5
         Fy=((1+(ey*ey)*(y-ym))**2)**0.5
-        return 1/Fx*Fy
+        return 1/(Fx*Fy)
 
     def rbf_eUzal(self, x, y, xm, ym, ex, ey):#Erol Hocanın önerdiği formda baz fonksiyon  
-        Fx = 1+(x-xm)**2
-        Fy = 1+(y-ym)**2
-        return 1/Fx*Fy
-        
+        Fx = 1+(ex*ex)*(x-xm)**2
+        Fy = 1+(ey*ey)*(y-ym)**2
+        return 1/(Fx*Fy)
+    
+
+    
     def add_center_points(self,xm,ym,ex,ey,c=tf.zeros([1,1])):
+        c=tf.cast(c,dtype=self.dtype)
         if self.number_of_center_points==0: 
             self.Xm=tf.reshape(xm,[1,-1]);         self.Ym=tf.reshape(ym,[1,-1])
             self.Ex=tf.reshape(ex,[1,-1]);         self.Ey=tf.reshape(ey,[1,-1]);
@@ -178,7 +183,7 @@ class RBF_function_2D:
         self.C=tf.cast(self.C,dtype=self.dtype)
 
         self.Ir=tf.ones_like(self.Xm)
-        self.number_of_center_points=len(self.Xm[:,0].numpy())
+        self.number_of_center_points=len(self.Xm[0,:].numpy())
                 
     def get_matrix(self,x,y,der='f'):
         # x=tf.reshape(x, [-1,1])
@@ -201,6 +206,20 @@ class RBF_function_2D:
         elif der=='fyy':
             M=self.tf_Pyy(X,Y,Xm,Ym,Ex,Ey)
         return M
+    
+    def set_tranible_parameters(self,Xm=False,Ym=False,Ex=False,Ey=False,C=True):
+        self.trainable_variables=[]
+        if Xm:
+            self.Xm=tf.Variable(self.Xm); self.trainable_variables.append(self.Xm)
+        if Ym:
+            self.Ym=tf.Variable(self.Ym); self.trainable_variables.append(self.Ym)
+        if Ex:
+            self.Ex=tf.Variable(self.Ex); self.trainable_variables.append(self.Ex)
+        if Ey:
+            self.Ey=tf.Variable(self.Ey); self.trainable_variables.append(self.Ey)
+        if C:
+            self.C=tf.Variable(self.C); self.trainable_variables.append(self.C)
+            
     
     def model(self,x,y,der='f'):
         M=self.get_matrix(x,y,der)
@@ -249,7 +268,7 @@ class collocation_2D:
         self.number_of_boundry_geometry=0 
         self.number_of_body_geometry=0
         self.err_type=errType
-        self.limit_of_error=1e-5
+        self.limit_of_error=1e-12
         #self.usePoly=False
 
     def add_boundry(self,geo,fcn,condition,color='xk'): # Sınır noktalarda koşulları listeye kaydet 
@@ -305,6 +324,90 @@ class collocation_2D:
         tmpC=tf_linsolve(M,B)
         self.FCN.C=tmpC
         
+    def get_boundry_loss(self): # Sınır bölgelerinde hata değerlerini hesapla 
+        total_loss=tf.zeros([1,],dtype=self.FCN.dtype)
+        for boundry_points in self.list_of_boundry_geometry: # 
+            tmpM,tmpB=boundry_points.fcn_m(boundry_points,self.FCN)
+            preditction=tf.matmul(tmpM, self.FCN.C)
+            loss_boundry=loss_Func(preditction,tmpB,self.err_type)
+            #loss_boundry=loss_func_with_err(oss_on_boundry,self.err_type)
+            total_loss=total_loss+loss_boundry
+        return total_loss
+    
+    
+    def get_body_loss(self): # Diferansiyel hatalarını hesapla 
+        total_loss=tf.zeros([1,],dtype=self.FCN.dtype)
+        for body_points in self.list_of_body_geometry: # 
+            tmpM,tmpB=body_points.fcn_m(body_points,self.FCN)
+            preditction=tf.matmul(tmpM, self.FCN.C)
+            loss_body=loss_Func(preditction,tmpB,self.err_type)
+            total_loss=total_loss+loss_body
+        return total_loss
+        
+    def get_random_parameters(self,parameters,use=True):# Eğitim aşamasında rasgele parametre eğitmek için kullanılıyor 
+        par_list=[]
+        for w in parameters:
+            if use:
+                random_par = tf.random.uniform(shape=w.shape, 
+                                               minval=0, maxval=1.0, dtype=self.FCN.dtype)
+                random_par=tf.cast(random_par, self.FCN.dtype)
+                #random_par=tf.round(random_par,0)
+            else: 
+                random_par=tf.ones_like(w)
+            par_list.append(random_par*w)
+        return par_list
+    
+    def train(self,epoch,lr=0.0001,num=100,c=[0.5,0.5],errType='rmse',usePoly=False,reset=True,title='training'): # PINN katsayılarını eğit 
+        self.usePoly=usePoly
+        self.err_type=errType
+        
+        log=np.zeros([epoch,4])
+        if reset: 
+            self.log=np.zeros([1,4])
+            
+        for body_points in self.list_of_body_geometry:
+            if not body_points.isTensor:
+                body_points.convert_tensor(self.FCN.dtype)
+                
+        for boundry_points in self.list_of_boundry_geometry:
+            if not boundry_points.isTensor:
+                boundry_points.convert_tensor(self.FCN.dtype)
+                
+        optimizer=tf.optimizers.Adam(learning_rate =lr, 
+                             beta_1 = 0.75, beta_2 = 0.999, epsilon = 1e-8)
+        
+        trainable_variables = self.FCN.trainable_variables
+        np_variables = [v.numpy() for v in trainable_variables]
+        self.t0=t.time()
+        for i in range(epoch):
+            with tf.GradientTape(persistent=True) as tape:#
+                #tape.watch(trainable_variables) #self.model.trainable_variables[2].value
+                loss_boundry=self.get_boundry_loss()
+                loss_body=self.get_body_loss()
+                loss=c[0]*loss_boundry+c[1]*loss_body
+            dW=tape.gradient(loss, self.FCN.trainable_variables)
+            ddW=self.get_random_parameters(dW)
+            optimizer.apply_gradients(zip(ddW, self.FCN.trainable_variables))
+            #np_variables2 = [v.numpy() for v in trainable_variables]
+            log[i,:]=[i+self.log[-1,0],loss_boundry[0].numpy(),loss_body[0].numpy(),loss[0].numpy()]
+            if i % num==0 or i<10: 
+                print('itr:',i+self.log[-1,0],'  sub itr:',i,'  ',title,'\n lbound:',loss_boundry.numpy(),
+                      '\n lbody:',loss_body.numpy(),'\n loss:',loss.numpy(),'\n \n')
+                
+            if loss.numpy()<self.limit_of_error:
+                print('çözüme ulaşıldı l:',loss)
+                break 
+        self.SIM_time=t.time()-self.t0
+        if reset: 
+            self.log=log
+        else: 
+            self.log=np.concatenate((self.log, log))
+        print('PINN simulation time : ',self.SIM_time)
+        
+        del(optimizer)
+    
+    
+        
     def predict(self,x,y):
         prediction= self.FCN.predict(np_X,np_Y)
         prediction2D=np.reshape(prediction,shape_X)
@@ -318,6 +421,92 @@ class collocation_2D:
                    np.sqrt(U_x**2+U_y**2)]
         return np_vector
     
+    def apply_filter_with_np(self,Data,n):
+        sy,sx=Data.shape 
+        NewData=Data.copy()
+        for i in range(n+1,sx-n-1):
+            for j in range(n+1,sy-n-1):
+                NewData[j,i]=np.mean(np.mean(Data[j-n:j+n,i-n:i+n]))
+        return NewData
+    
+    def find_max_errs_np(self,Data,val=0.75):
+
+        sy,sx=Data.shape 
+        NewData=np.abs(np.reshape(Data.copy(),[-1,]))
+        data_max=np.max(np.max(NewData))
+        
+        for i in range(len(NewData)): 
+            if NewData[i]<=data_max*val:
+                NewData[i]=0; 
+            else: 
+                data=1 
+        newData2D=np.reshape(NewData,Data.shape)
+        norm_data=np.array(255*np.abs(newData2D.copy())/data_max, dtype=np.uint8)
+        ret, bw = cv2.threshold(norm_data, 0, 50,cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
+        connectivity = 3
+        nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(norm_data, connectivity, cv2.CV_32S)
+        sizes = stats[1:, -1]; nb_components = nb_components - 1
+        min_size = 1 #threshhold value for objects in scene
+        s1,s2=bw.shape
+        img2 = np.zeros(([s1,s2,3]), np.uint8)
+        params=[]
+
+        if nb_components>1:
+            maxVal=np.max(stats[1:-1,4])
+        
+            for i in range(1, nb_components):
+                # use if sizes[i] >= min_size: to identify your objects
+                color = np.random.randint(255,size=5)
+                # draw the bounding rectangele around each object
+                cv2.rectangle(img2, (stats[i][0],stats[i][1]),(stats[i][0]+stats[i][2],stats[i][1]+stats[i][3]), (0,255,0), 2)
+                #img2[output == i + 1] = color
+                if maxVal==stats[i,4] and nb_components>1:
+                    xm=centroids[i,0]/s2;   ym=centroids[i,1]/s1
+                    dx=stats[i,2]/s2;       dy=stats[i,3]/s1
+                    params.append([[xm,ym],[dx,dy]])
+                    self.RBF_add_center_point_with_points(xm,ym,2/dx,2/dy)
+        #cv2.imshow("bw",norm_data)
+        #cv2.imshow("thresh",img2)
+        return newData2D,params
+            
+    def error_analysis_on_geometry(self,geo,fcn_m,figNo):
+        condition=lambda x,y: 1>0
+
+        X2D=geo.X2D
+        Y2D=geo.Y2D
+        shape2D=X2D.shape
+        x,f,k,dk,q=geo.get_value(condition)
+        tmp_body=points_2D(fcn_m,'.k')
+        tmp_body.add_points(x, f, k, dk, q)
+        tmp_body.convert_tensor(self.FCN.dtype)
+        tmpM,tmpB=fcn_m(tmp_body,self.FCN)
+        preditction=tf.matmul(tmpM, self.FCN.C)
+        Ub=self.FCN.get_matrix(tmp_body.X,tmp_body.Y,der='f')
+        
+        bases_f=tf.matmul(Ub, tf.ones_like(self.FCN.C))
+        bases_diff=tf.matmul(tmpM, tf.ones_like(self.FCN.C))
+        err=tmpB-preditction
+        err_2D=tf.reshape(err,shape2D)
+        bases_f_2D=tf.reshape(bases_f,shape2D)
+        bases_diff_2D=tf.reshape(bases_diff,shape2D)
+        
+        filtered=self.apply_filter_with_np(err_2D.numpy(),5)
+        filtered2,params=self.find_max_errs_np(filtered)
+        #filtered=cv2.GaussianBlur(err_2D.numpy(), (4,4), 0)
+        
+        plot_surf_2D(figNo,221,X2D[1:-1,1:-1],Y2D[1:-1,1:-1],err_2D[1:-1,1:-1],'err2D')
+        plot_surf_3D(figNo,222,X2D[1:-1,1:-1],Y2D[1:-1,1:-1],filtered[1:-1,1:-1],'err3D')
+        plot_surf_3D(figNo,223,X2D[1:-1,1:-1],Y2D[1:-1,1:-1],bases_f_2D[1:-1,1:-1],'bases')
+        plot_surf_3D(figNo,224,X2D[1:-1,1:-1],Y2D[1:-1,1:-1],filtered2[1:-1,1:-1],'|err3D|')
+        #plot_surf_3D(figNo,224,X2D[1:-1,1:-1],Y2D[1:-1,1:-1],abs(err_2D[1:-1,1:-1]),'|err3D|')
+        print(params)
+            
+
+    def plot_log(self,figNo): 
+        plot_points(figNo,311,self.log[:,0],self.log[:,3],title='total loss')
+        plot_points(figNo,312,self.log[:,0],self.log[:,1],title='boundry loss')
+        plot_points(figNo,313,self.log[:,0],self.log[:,2],title='body loss')
+        
     def plot_function(self,figNo,subNo,X2D,Y2D,title='collocation'):
         resoults=self.FCN.predict(X2D,Y2D)
         plot_surf_2D(figNo,subNo,X2D,Y2D,resoults,title)

@@ -24,14 +24,14 @@ Ax1=0.0/Amax # C x=L boyutsuz sıcaklık
 Ay0=0.0/Amax # C x=0 boyutsuz sıcaklık     
 Ay1=0.0/Amax # C x=L boyutsuz sıcaklık    
 
-M0=Mu0/Mumax  # boyutsuz manyetik geçirgenlik 
+M0=Mu0#/Mumax  # boyutsuz manyetik geçirgenlik 
 M1=1000*M0 # 14872*M0
 f0=1/M0
 f1=1/M1
-J=N*I/(Am)/Jmax; # Boyutsuz akı
+J=N*I/(Am)#/Jmax; # Boyutsuz akı
 
 # Geometri tanımlama işlemleri  
-geo=GEOMETRY_2D([0,0],[L,L],f0,n=[25,25])
+geo=GEOMETRY_2D([0,0],[L,L],f0,n=[29,29])
 # Geometriyi tanımla 
 geo.set_function_value(Ax0, lambda x,y: x==0,Type='f')
 geo.set_function_value(Ax1, lambda x,y: x==L,Type='f')
@@ -131,22 +131,24 @@ T_FDA=FDAgs.resoult_FDA.F2D # Sonlu farklar çözümü
 
 # FDAgs.resoult_FDA.plot_stream_line(5,132)
 # FDAgs.resoult_FDA.plot_magnetic_fields(4)
-FDAgs.plot_log(6,212)
+# FDAgs.plot_log(6,212)
 
 FDA=FDAgs
 ## Buradan sonra Polinom Kollokasyonu Uygulanacak 
 Coll_RBF2D=collocation_2D(par=['gauss'],Type='rbf')
+Coll_RBF2D.FCN.set_function_type('gauss') # gauss mquad  iquad imquad
 
 # Kollokasyon noktalarını tanımla
-geo_center_points=GEOMETRY_2D([0,0],[L,L],f0,n=[11,11])
+geo_center_points=GEOMETRY_2D([0,0],[L,L],f0,n=[15,15])
 geo_center_points.get_derivative_of_par()
 
 #Coll_RBF2D.RBF_add_center_point_with_points(0.5, 0.5, 1, 1)# xm, ym, ex, ey
-cond_center_points=lambda x,y: x>0 and x<L and y>=0 and y<L
-Coll_RBF2D.RBF_add_center_point_with_geo(geo_center_points, cond_center_points)
+cond_center_points=lambda x,y: x>0 and x<L and y>0 and y<L
+Coll_RBF2D.RBF_add_center_point_with_geo(geo_center_points, cond_center_points,1.0)
 
 Coll_RBF2D.FCN.Xm
 Coll_RBF2D.FCN.Ex
+Coll_RBF2D.FCN.Ey
 
 
 def fcn_boundry(geo,model):  # x=L, y=0, y=L ==> T=0 
@@ -154,12 +156,12 @@ def fcn_boundry(geo,model):  # x=L, y=0, y=L ==> T=0
     Resoults=geo.F
     return Matrix,Resoults
 
-def fcn_PDE(geo,model): # U=[[U],[dU/dx,dU/dy], [d2U/dx2,d2U/dxdy,d2U/dy2]]
-    Uxx=model.get_matrix(geo.X,geo.Y,der='fxx')
-    Uyy=model.get_matrix(geo.X,geo.Y,der='fyy')
-    Matrix=(geo.k*model.Ir)*(Uxx+Uyy) # Diferansiyel denklem / Differential equation 
-    Resoults=geo.q
-    return Matrix,Resoults
+# def fcn_PDE(geo,model): # U=[[U],[dU/dx,dU/dy], [d2U/dx2,d2U/dxdy,d2U/dy2]]
+#     Uxx=model.get_matrix(geo.X,geo.Y,der='fxx')
+#     Uyy=model.get_matrix(geo.X,geo.Y,der='fyy')
+#     Matrix=(geo.k*model.Ir)*(Uxx+Uyy) # Diferansiyel denklem / Differential equation 
+#     Resoults=geo.q
+#     return Matrix,Resoults
 
 # Sınır koşullarını belirle 
 cond_boundry_x0=lambda x,y: x==0
@@ -186,12 +188,30 @@ Coll_RBF2D.FCN.C
 XX=FDA.resoult_FDA.X2D[1:-1,1:-1]
 YY=FDA.resoult_FDA.Y2D[1:-1,1:-1]
 
-FDA.resoult_FDA.plot_function_2D(7,221)
-FDA.resoult_FDA.plot_stream_line(7,222)
+FDA.resoult_FDA.plot_function_2D(7,231)
+FDA.resoult_FDA.plot_stream_line(7,234)
 
-Coll_RBF2D.plot_function(7, 223, XX, YY)
-Coll_RBF2D.plot_stream_line(7, 224, XX, YY)
+Coll_RBF2D.plot_function(7, 232, XX, YY)
+Coll_RBF2D.plot_stream_line(7, 235, XX, YY)
 Coll_RBF2D.plot_curl_2D(8, XX, YY)
+
+
+# Model non-lineer parameter optimization 
+C_first=Coll_RBF2D.FCN.C
+Coll_RBF2D.FCN.set_tranible_parameters(Xm=False,Ym=False,Ex=True,Ey=True,C=True)
+Tvars=Coll_RBF2D.FCN.trainable_variables
+
+Coll_RBF2D.train(500,lr=0.0001,c=[0.5,0.5],num=10,errType='mse') # 100 iterasyon koşur 
+C_last=Coll_RBF2D.FCN.C
+C_=np.concatenate((C_first, C_last),axis=1)
+
+Coll_RBF2D.plot_function(7, 233, XX, YY)
+Coll_RBF2D.plot_stream_line(7, 236, XX, YY)
+Coll_RBF2D.plot_curl_2D(9, XX, YY)
+
+Coll_RBF2D.plot_log(10)
+
+
 """
 
 """

@@ -7,6 +7,7 @@ Hava nüveli manyetik alan çözümü
 from class_FDA import *
 from class_Collocation import *
 
+
 # Boyutsuzlaştırma için gerekli parametreler 
 Lmax=1; # karakteristik uzunluk 
 I=1; # karakteristik akım 
@@ -24,14 +25,17 @@ Ax1=0.0/Amax # C x=L boyutsuz sıcaklık
 Ay0=0.0/Amax # C x=0 boyutsuz sıcaklık     
 Ay1=0.0/Amax # C x=L boyutsuz sıcaklık    
 
-M0=Mu0/Mumax  # boyutsuz manyetik geçirgenlik 
+M0=Mu0#/Mumax  # boyutsuz manyetik geçirgenlik 
 M1=1000*M0 # 14872*M0
 f0=1/M0
 f1=1/M1
-J=N*I/(Am)/Jmax; # Boyutsuz akı
+J=N*I/(Am)#/Jmax; # Boyutsuz akı
+
+center_points=21
+FDA_points=2*(center_points-1)+1
 
 # Geometri tanımlama işlemleri  
-geo=GEOMETRY_2D([0,0],[L,L],f0,n=[40,40])
+geo=GEOMETRY_2D([0,0],[L,L],f0,n=[FDA_points,FDA_points])
 # Geometriyi tanımla 
 geo.set_function_value(Ax0, lambda x,y: x==0,Type='f')
 geo.set_function_value(Ax1, lambda x,y: x==L,Type='f')
@@ -42,8 +46,8 @@ geo.set_function_value(J, lambda x,y: 0.4<=x<=0.6 and 0.4<=y<=0.6,Type='q')
 geo_copy=geo.copy()
 
 geo.set_function_value(f1, lambda x,y: 0.1<=x<=0.30 and 0.35<=y<=0.65,Type='p')
-# geo.set_function_value(f1, lambda x,y: 0.7<=x<=0.90 and 0.35<=y<=0.65,Type='p')
-# geo.set_function_value(f1, lambda x,y: 0.1<=x<=0.90 and 0.7<=y<=0.8,Type='p')
+geo.set_function_value(f1, lambda x,y: 0.7<=x<=0.90 and 0.35<=y<=0.65,Type='p')
+geo.set_function_value(f1, lambda x,y: 0.1<=x<=0.90 and 0.7<=y<=0.8,Type='p')
 
 # geo.set_function_value((f1+f0)/2, lambda x,y: x==0.1 and 0.35<=y<=0.65,Type='p')
 # geo.set_function_value((f1+f0)/2, lambda x,y: x==0.30 and 0.35<=y<=0.65,Type='p')
@@ -119,7 +123,7 @@ FDAgs=FDA_2D(geo,pde_Maxwels_equation_2D) # gauss - sider iterasyonu sonlu farkl
 # FDAgs.set_more_calculation_area('x0') # x=0 da simetri koşulu dT/dx=0 
 
 # FDAgs.apply_FDA(500)
-FDAgs.apply_FDA_with_gauss_sider(500,lamda=0.99)
+FDAgs.apply_FDA_with_gauss_sider(50,lamda=0.99)
 FDAgs.resoult_FDA.plot_function_values_2D(2,color='-g')
 # F2Dgs=FDAgs.resoult_FDA.F2D
 Bgs=FDAgs.apply_cross_product()
@@ -131,21 +135,23 @@ T_FDA=FDAgs.resoult_FDA.F2D # Sonlu farklar çözümü
 
 # FDAgs.resoult_FDA.plot_stream_line(5,132)
 FDAgs.resoult_FDA.plot_magnetic_fields(4)
-FDAgs.plot_log(6,212)
+# FDAgs.plot_log(6,212)
 
 FDA=FDAgs
 
 
 ## Buradan sonra Polinom Kollokasyonu Uygulanacak 
 Coll_RBF2D=collocation_2D(par=['mquad'],Type='rbf')
-Coll_RBF2D.FCN.set_function_type('gauss') # gauss mquad  iquad imquad
+Coll_RBF2D.FCN.set_function_type('eUzal') # gauss mquad  iquad imquad eUzal
 
 # Kollokasyon noktalarını tanımla
-geo_center_points=GEOMETRY_2D([0,0],[L,L],f0,n=[15,15])
+# geo_center_points=GEOMETRY_2D([0,0],[L,L],f0,n=[center_points,center_points])
+geo_center_points=GEOMETRY_2D([0,0],[L,L],f0,n=[5,5])
+
 geo_center_points.get_derivative_of_par()
 
-#Coll_RBF2D.RBF_add_center_point_with_points(0.5, 0.5, 1, 1)# xm, ym, ex, ey
-cond_center_points=lambda x,y: x>=0 and x<L and y>0 and y<L
+# Coll_RBF2D.RBF_add_center_point_with_points(0.5, 0.5, 6, 6)# xm, ym, ex, ey
+cond_center_points=lambda x,y: x>0 and x<L and y>0 and y<L
 Coll_RBF2D.RBF_add_center_point_with_geo(geo_center_points, cond_center_points,1.0)#geo, condition, par
 
 Coll_RBF2D.FCN.Xm
@@ -154,7 +160,17 @@ Coll_RBF2D.FCN.Ex
 
 def fcn_boundry(geo,model):  # x=L, y=0, y=L ==> T=0 
     Matrix=model.get_matrix(geo.X,geo.Y,der='f')
-    Resoults=geo.F
+    Resoults=tf.zeros_like(geo.F)
+    return Matrix,Resoults
+
+def fcn_boundry_fx(geo,model):  # x=L, y=0, y=L ==> T=0 
+    Matrix=model.get_matrix(geo.X,geo.Y,der='fx')
+    Resoults=tf.zeros_like(geo.F)
+    return Matrix,Resoults
+
+def fcn_boundry_fy(geo,model):  # x=L, y=0, y=L ==> T=0 
+    Matrix=model.get_matrix(geo.X,geo.Y,der='fy')
+    Resoults=tf.zeros_like(geo.F)
     return Matrix,Resoults
 
 def fcn_PDE(geo,model): # U=[[U],[dU/dx,dU/dy], [d2U/dx2,d2U/dxdy,d2U/dy2]]
@@ -162,8 +178,8 @@ def fcn_PDE(geo,model): # U=[[U],[dU/dx,dU/dy], [d2U/dx2,d2U/dxdy,d2U/dy2]]
     Uyy=model.get_matrix(geo.X,geo.Y,der='fyy')
     Ux=model.get_matrix(geo.X,geo.Y,der='fx')
     Uy=model.get_matrix(geo.X,geo.Y,der='fy')
-    # Matrix=-(geo.k*model.Ir)*(Uxx+Uyy) # Diferansiyel denklem / Differential equation 
-    Matrix=-(geo.dk_dx*model.Ir)*Ux-(geo.dk_dy*model.Ir)*Uy-(geo.k*model.Ir)*(Uxx+Uyy) # Diferansiyel denklem / Differential equation 
+    Matrix=-(geo.k*model.Ir)*(Uxx+Uyy) # Diferansiyel denklem / Differential equation 
+    #Matrix=-(geo.dk_dx*model.Ir)*Ux-(geo.dk_dy*model.Ir)*Uy-(geo.k*model.Ir)*(Uxx+Uyy) # Diferansiyel denklem / Differential equation 
     Resoults=geo.q
     return Matrix,Resoults
 
@@ -181,7 +197,7 @@ print('boundry count',Coll_RBF2D.number_of_boundry_geometry)
 
 # Gövdeleri belirle 
 cond_body=lambda x,y: x>0 and x<L and y>0 and y<L
-Coll_RBF2D.add_body(FDA.resoult_FDA,fcn_PDE,cond_body) # y=L için bütün noktalar 
+Coll_RBF2D.add_body(geo,fcn_PDE,cond_body) # y=L için bütün noktalar 
 print('body count',Coll_RBF2D.number_of_body_geometry)
 
 
@@ -192,12 +208,55 @@ Coll_RBF2D.FCN.C
 XX=FDA.resoult_FDA.X2D[1:-1,1:-1]
 YY=FDA.resoult_FDA.Y2D[1:-1,1:-1]
 
-FDA.resoult_FDA.plot_function_2D(7,221)
-FDA.resoult_FDA.plot_stream_line(7,222)
+FDA.resoult_FDA.plot_function_2D(7,231)
+FDA.resoult_FDA.plot_stream_line(7,234)
 
-Coll_RBF2D.plot_function(7, 223, XX, YY)
-Coll_RBF2D.plot_stream_line(7, 224, XX, YY)
+Coll_RBF2D.plot_function(7, 232, XX, YY)
+Coll_RBF2D.plot_stream_line(7, 235, XX, YY)
 Coll_RBF2D.plot_curl_2D(8, XX, YY)
+
+
+# Model non-lineer parameter optimization 
+C_first=Coll_RBF2D.FCN.C
+# Coll_RBF2D.FCN.set_tranible_parameters(Xm=True,Ym=True,Ex=False,Ey=False,C=False)
+# Coll_RBF2D.train(250,lr=0.005,c=[0.1,0.9],num=10,errType='rmse') # 100 iterasyon koşur 
+# Coll_RBF2D.apply_collocation()
+Coll_RBF2D.FCN.set_tranible_parameters(Xm=False,Ym=False,Ex=True,Ey=True,C=False)
+Coll_RBF2D.train(2,lr=0.001,c=[0.1,0.9],num=10,errType='rmse',reset=True,title='shape parameters') # 100 iterasyon koşur 
+
+for i in range(5):
+    Coll_RBF2D.error_analysis_on_geometry(geo,fcn_PDE,9)
+
+    # Coll_RBF2D.FCN.set_tranible_parameters(Xm=False,Ym=False,Ex=True,Ey=True,C=False)
+    # Coll_RBF2D.train(10,lr=0.001,c=[0.1,0.9],num=10,errType='mse',reset=False,title='shape parameters') # 100 iterasyon koşur 
+    
+    # Coll_RBF2D.FCN.set_tranible_parameters(Xm=True,Ym=True,Ex=False,Ey=False,C=False)
+    # Coll_RBF2D.train(10,lr=0.001,c=[0.1,0.9],num=10,errType='rmse',reset=False,title='center points') # 100 iterasyon koşur 
+    # # Coll_RBF2D.apply_collocation()
+    
+    Coll_RBF2D.FCN.set_tranible_parameters(Xm=False,Ym=False,Ex=False,Ey=False,C=True)
+    Coll_RBF2D.train(10,lr=0.00001,c=[0.1,0.9],num=10,errType='rmse',reset=False,title='weights') # 100 iterasyon koşur 
+    # Coll_RBF2D.apply_collocation()
+    
+
+Tvars=Coll_RBF2D.FCN.trainable_variables
+
+# Coll_RBF2D.train(500,lr=0.001,c=[0.5,0.5],num=10,errType='mse') # 100 iterasyon koşur 
+C_last=Coll_RBF2D.FCN.C
+# C_=np.concatenate((C_first, C_last),axis=1)
+
+Coll_RBF2D.plot_function(7, 233, XX, YY)
+Coll_RBF2D.plot_stream_line(7, 236, XX, YY)
+Coll_RBF2D.plot_curl_2D(9, XX, YY)
+"""  
 """
+# Coll_RBF2D.plot_log(10)
+
+CC=Coll_RBF2D.FCN.C.numpy()
+CCex=Coll_RBF2D.FCN.Ex.numpy()
+CCey=Coll_RBF2D.FCN.Ey.numpy()
+
+"""
+
 
 """
