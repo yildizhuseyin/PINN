@@ -26,7 +26,7 @@ Ay0=0.0/Amax # C x=0 boyutsuz sıcaklık
 Ay1=0.0/Amax # C x=L boyutsuz sıcaklık    
 
 M0=Mu0#/Mumax  # boyutsuz manyetik geçirgenlik 
-M1=1000*M0 # 14872*M0
+M1=100*M0 # 14872*M0
 f0=1/M0
 f1=1/M1
 J=N*I/(Am)#/Jmax; # Boyutsuz akı
@@ -140,13 +140,13 @@ FDAgs.resoult_FDA.plot_magnetic_fields(4)
 FDA=FDAgs
 
 
-## Buradan sonra Polinom Kollokasyonu Uygulanacak 
+## Buradan sonra RBF Kollokasyonu Uygulanacak 
 Coll_RBF2D=collocation_2D(par=['mquad'],Type='rbf')
 Coll_RBF2D.FCN.set_function_type('gauss') # gauss mquad  iquad imquad eUzal
 
 # Kollokasyon noktalarını tanımla
-geo_center_points=GEOMETRY_2D([0,0],[L,L],f0,n=[center_points,center_points])
-# geo_center_points=GEOMETRY_2D([0,0],[L,L],f0,n=[5,5])
+# geo_center_points=GEOMETRY_2D([0,0],[L,L],f0,n=[center_points,center_points])
+geo_center_points=GEOMETRY_2D([0,0],[L,L],f0,n=[5,5])
 
 geo_center_points.get_derivative_of_par()
 
@@ -187,7 +187,7 @@ def fcn_jump(geo,model):  # x=L, y=0, y=L ==> T=0
 # curl(A) U_y i -U_x
     Ux=model.get_matrix(geo.X,geo.Y,der='fx')
     Uy=model.get_matrix(geo.X,geo.Y,der='fy')
-    Dk=(geo.k-geo.k2)*model.Ir
+    Dk=(geo.k2-geo.k)*model.Ir
     ax=(geo.nx*model.Ir)
     ay=(geo.ny*model.Ir)
     #Matrix=Dk*(ax*Ux+ay*Uy)
@@ -227,8 +227,8 @@ cond_jump1_x=lambda x,y: ((0.09<x<0.11 and 0.26<y<0.53) or (0.29<x<0.31 and 0.26
 cond_jump1_y=lambda x,y: ((0.11<x<0.28 and 0.23<y<0.26) or (0.11<x<0.28 and 0.53<y<0.57) )
 cond_jump2_x=lambda x,y: ((0.68<x<0.72 and 0.26<y<0.53) or (0.89<x<0.91 and 0.26<y<0.53) )
 cond_jump2_y=lambda x,y: ((0.72<x<0.86 and 0.23<y<0.26) or (0.72<x<0.88 and 0.53<y<0.57) )
-cond_jump3_x=lambda x,y: ((0.08<x<0.12 and 0.72<y<0.87) or (0.88<x<0.91 and 0.62<y<0.87) )
-cond_jump3_y=lambda x,y: ((0.12<x<0.86 and 0.68<y<0.72) or (0.12<x<0.88 and 0.88<y<0.92) )
+cond_jump3_x=lambda x,y: ((0.08<x<0.12 and 0.62<y<0.87) or (0.88<x<0.91 and 0.62<y<0.87) )
+cond_jump3_y=lambda x,y: ((0.12<x<0.86 and 0.59<y<0.61) or (0.12<x<0.88 and 0.89<y<0.91) )
 
 
 
@@ -273,7 +273,6 @@ Coll_RBF2D.plot_curl_2D(8, XX, YY)
 Coll_RBF2D.FCN.C=tf.abs(Coll_RBF2D.FCN.C)
   
 
-
 # Model non-lineer parameter optimization 
 C_first=Coll_RBF2D.FCN.C
 # Coll_RBF2D.FCN.set_tranible_parameters(Xm=True,Ym=True,Ex=False,Ey=False,C=False)
@@ -289,20 +288,19 @@ Coll_RBF2D.train(200,lr=0.05,c=oran,num=10,errType='rmse',reset=True,title='shap
 
 
 for i in range(10):
-    # Coll_RBF2D.error_analysis_on_geometry(geo,fcn_PDE,9)
+    Coll_RBF2D.error_analysis_on_geometry(geo,fcn_PDE,9)
 
-    Coll_RBF2D.FCN.set_tranible_parameters(Xm=False,Ym=False,Ex=True,Ey=True,C=False)
-    Coll_RBF2D.train(100,lr=0.01,c=oran,num=10,errType='rse',reset=False,title='shape parameters') # 100 iterasyon koşur 
+    # Coll_RBF2D.FCN.set_tranible_parameters(Xm=False,Ym=False,Ex=True,Ey=True,C=False)
+    # Coll_RBF2D.train(100,lr=0.01,c=oran,num=10,errType='rse',reset=False,title='shape parameters') # 100 iterasyon koşur 
     
     # Coll_RBF2D.FCN.set_tranible_parameters(Xm=True,Ym=True,Ex=False,Ey=False,C=False)
     # Coll_RBF2D.train(100,lr=1e-2,c=oran,num=10,errType='mse',reset=False,title='center points') # 100 iterasyon koşur 
     # # # Coll_RBF2D.apply_collocation()
     
-    Coll_RBF2D.FCN.set_tranible_parameters(Xm=False,Ym=False,Ex=False,Ey=False,C=True)
-    Coll_RBF2D.train(100,lr=1e-7,c=oran,num=10,errType='rse',reset=False,title='weights') # 100 iterasyon koşur 
+    # Coll_RBF2D.FCN.set_tranible_parameters(Xm=False,Ym=False,Ex=False,Ey=False,C=True)
+    # Coll_RBF2D.train(100,lr=1e-7,c=oran,num=10,errType='rse',reset=False,title='weights') # 100 iterasyon koşur 
     # Coll_RBF2D.apply_collocation()
     
-
 
 Tvars=Coll_RBF2D.FCN.trainable_variables
 

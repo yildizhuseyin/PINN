@@ -195,17 +195,16 @@ def fcn_boundry(geo,U):  # x=L, y=0, y=L ==> T=0
     err=tf.zeros_like(geo.F)-values
     return err
 
+def fcn_jump(geo,U):  # x=L, y=0, y=L ==> T=0 
+# curl(A) U_y i -U_x j
+    Dk=(geo.k2-geo.k)
+    Matrix=Dk*(geo.nx*U[1][1]-geo.ny*U[1][0])
+    Resoults=tf.zeros_like(geo.F)
+    return Matrix,Resoults
+
 def fcn_PDE(geo,U): # U=[[U],[dU/dx,dU/dy], [d2U/dx2,d2U/dxdy,d2U/dy2]]
-    #pde=dk_dx*Ux+dk_dy*Uy+k*(Uxx+Uyy)
-    #PDE_loss=(geo.dk_dx*U[1][0]+geo.dk_dy*U[1][1])+geo.k*(U[2][0]+U[2][2])
-    #PDE_loss=geo.q+geo.k*(U[2][0]+U[2][2]) # Diferansiyel denklem / Differential equation 
-    PDE_loss=geo.q+geo.k*(U[2][0]+U[2][2])+(geo.dk_dx*U[1][0]+geo.dk_dy*U[1][1]) # Diferansiyel denklem / Differential equation 
-    # a=U[0][0].numpy()
-    # ax=U[1][0].numpy()
-    # ay=U[1][1].numpy()
-    # axx=U[2][0].numpy()
-    # axy=U[2][1].numpy()
-    # ayy=U[2][2].numpy()
+     #PDE_loss=geo.q+geo.k*(U[2][0]+U[2][2])+(geo.dk_dx*U[1][0]+geo.dk_dy*U[1][1]) # Diferansiyel denklem / Differential equation 
+    PDE_loss=geo.q+geo.k*(U[2][0]+U[2][2]) # Diferansiyel denklem / Differential equation 
     return PDE_loss
 
 # Sınır koşullarını belirle 
@@ -221,18 +220,34 @@ PINN.add_boundry(geo,fcn_boundry,cond_boundry_yL) # y=L için bütün noktalar
 print('boundry x',PINN.boundry_points.np_x)
 
 # Gövdeleri belirle 
-cond_body=lambda x,y: x>0 and x<L and y>0 and y<L
-PINN.add_body(geo,fcn_PDE,cond_body) # y=L için bütün noktalar 
+cond_body0=lambda x,y: ((0<x<L and 0<y<L) and not (0.08<x<0.32 and 0.25<=y<=0.55) and not (0.4<=x<=0.6 and 0.3<=y<=0.5))
+cond_body1=lambda x,y: ((0<x<L and 0<y<L) and (0.12<x<0.28 and 0.27<y<0.53))
+cond_coil=lambda x,y: ((0<x<L and 0<y<L) and (0.4<=x<=0.6 and 0.3<=y<=0.5))
+
+PINN.add_body(geo,fcn_PDE,cond_body0,color='.b') # y=L için bütün noktalar
+PINN.add_body(geo,fcn_PDE,cond_body1,color='.k') # y=L için bütün noktalar 
+PINN.add_body(geo,fcn_PDE,cond_coil,color='.y') # y=L için bütün noktalar
 print('body x',PINN.body_points.np_x)
+
+
+cond_jump1_x=lambda x,y: ((0.08<x<0.11 and 0.26<y<0.53) or (0.29<x<0.31 and 0.26<y<0.53) )
+cond_jump1_y=lambda x,y: ((0.11<x<0.28 and 0.23<y<0.26) or (0.11<x<0.28 and 0.53<y<0.57) )
+
+
+
+PINN.add_jump_geometry(geo,fcn_jump,cond_jump1_x,[f0,f1],[-1,0],color='sk')
+PINN.add_jump_geometry(geo,fcn_jump,cond_jump1_y,[f0,f1],[0,-1],color='sk')
 
 PINN.plot_points_values_2D(7,221)
 
 T_0=PINN.predict(XX,YY) # Eğitim öncesi sıcaklıklar değerlerini getir 
 
-PINN.train(500,lr=0.01,c=[0.5,0.5],num=10,usePoly=False,errType='sse') # 100 iterasyon koşur 
+oranlar=[0.1,0.4,0.6]
 
-PINN.train(500,lr=0.005,c=[0.5,0.5],num=10,usePoly=False,errType='mse') # 100 iterasyon koşur 
-PINN.train(500,lr=0.001,c=[0.5,0.5],num=50,usePoly=False,errType='mse') # 100 iterasyon koşur 
+PINN.train(500,lr=0.01,c=oranlar,num=10,usePoly=False,errType='sse') # 100 iterasyon koşur 
+
+# PINN.train(500,lr=0.005,c=oranlar,num=10,usePoly=False,errType='mse') # 100 iterasyon koşur 
+# PINN.train(500,lr=0.001,c=oranlar,num=50,usePoly=False,errType='mse') # 100 iterasyon koşur 
 
 # PINN.train(500,lr=0.001,c=[0.5,0.5],num=100,usePoly=False,errType='mse') # 100 iterasyon koşur 
 # PINN.train(1500,lr=0.001,c=[0.5,0.5],num=100,usePoly=False,errType='rmse') # 100 iterasyon koşur 
@@ -256,7 +271,6 @@ PINN.plot_log(9)
 
 """
 
-"""
 
 np.random.randint(10, size=10)
 np.random.randint([1, 5, 7], 10)
@@ -264,3 +278,4 @@ np.random.choice(range(10, 101))
 
 tf.random.uniform(shape=np.range(1,10).shape, 
                                minval=0, maxval=10, dtype=tf.int32)
+"""

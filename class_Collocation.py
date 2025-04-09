@@ -371,8 +371,8 @@ class collocation_2D:
         for jump_points in self.list_of_jump_geometry: # 
             tmpM,tmpB=jump_points.fcn_m(jump_points,self.FCN)
             preditction=tf.matmul(tmpM, self.FCN.C)
-            loss_body=loss_Func(preditction,tmpB,self.err_type)
-            total_loss=total_loss+loss_body
+            loss_jump=loss_Func(preditction,tmpB,self.err_type)
+            total_loss=total_loss+loss_jump
         return total_loss
         
     def get_random_parameters(self,parameters,use=True):# Eğitim aşamasında rasgele parametre eğitmek için kullanılıyor 

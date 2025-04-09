@@ -19,10 +19,12 @@ class PINN_1D:
         self.dtype=self.model.dtype
         self.boundry_points=points_1D()
         self.body_points=points_1D()
-        self.list_of_boundry_points=[]
-        self.list_of_body_points=[]
+        self.list_of_boundry_geometry=[]
+        self.list_of_body_geometry=[]
+        self.list_of_jump_geometry=[]
         self.number_of_boundry_geometry=0 
         self.number_of_body_geometry=0
+        self.number_of_jump_geometry=0
         self.err_type=errType
         self.limit_of_error=1e-5
         self.usePoly=False
@@ -47,7 +49,7 @@ class PINN_1D:
             for i in range(len(x)):
               self.boundry_points.add_point(x[i],f[i],k[i],dk[i],q[i])  # silinecek 
               tmp_boundry.add_point(x[i],f[i],k[i],dk[i],q[i])  
-            self.list_of_boundry_points.append(tmp_boundry)
+            self.list_of_boundry_geometry.append(tmp_boundry)
             self.number_of_boundry_geometry+=1
         else: 
             print('veri aktarılırken bir hata oluştu')
@@ -59,14 +61,14 @@ class PINN_1D:
             for i in range(len(x)):
               self.body_points.add_point(x[i],f[i],k[i],dk[i],q[i])  # silinicek 
               tmp_body.add_point(x[i],f[i],k[i],dk[i],q[i])  
-            self.list_of_body_points.append(tmp_body)
+            self.list_of_body_geometry.append(tmp_body)
             self.number_of_body_geometry+=1
         else: 
             print('veri aktarılırken bir hata oluştu')
  
     def get_boundry_loss(self): # Sınır bölgelerinde hata değerlerini hesapla 
         total_loss=tf.zeros([1,])
-        for boundry_points in self.list_of_boundry_points: # 
+        for boundry_points in self.list_of_boundry_geometry: # 
             with tf.GradientTape(persistent=True) as tape_u:
                 tape_u.watch(boundry_points.X)
                 U = self.model(boundry_points.X,training=True)
@@ -96,7 +98,7 @@ class PINN_1D:
     
     def get_body_loss(self): # Diferansiyel hatalarını hesapla 
         total_loss=tf.zeros([1,])
-        for body_points in self.list_of_body_points: # 
+        for body_points in self.list_of_body_geometry: # 
             with tf.GradientTape(persistent=True) as tape_u:
                 tape_u.watch(body_points.X)
                 U = self.model(body_points.X,training=True)
@@ -129,11 +131,11 @@ class PINN_1D:
     def train(self,epoch,lr=0.0001,num=100,c=[0.5,0.5],errType='rmse',usePoly=False): # PINN katsayılarını eğit 
         self.usePoly=usePoly
         self.err_type=errType
-        for body_points in self.list_of_body_points:
+        for body_points in self.list_of_body_geometry:
             if not body_points.isTensor:
                 body_points.convert_tensor(self.model.dtype)
                 
-        for boundry_points in self.list_of_boundry_points:
+        for boundry_points in self.list_of_boundry_geometry:
             if not boundry_points.isTensor:
                 boundry_points.convert_tensor(self.model.dtype)
                 
@@ -182,10 +184,13 @@ class PINN_2D:
         self.dtype=self.model.dtype
         self.boundry_points=points_1D()
         self.body_points=points_1D()
-        self.list_of_boundry_points=[]
-        self.list_of_body_points=[]
+        self.list_of_boundry_geometry=[]
+        self.list_of_body_geometry=[]
+        self.list_of_jump_geometry=[]
         self.number_of_boundry_geometry=0 
         self.number_of_body_geometry=0
+        self.number_of_jump_geometry=0
+
         self.err_type=errType
         self.limit_of_error=1e-5
         self.usePoly=False
@@ -207,7 +212,7 @@ class PINN_2D:
         x,f,k,dk,q=geo.get_value(condition)
         tmp_boundry=points_2D(fcn,color)
         tmp_boundry.add_points(x, f, k, dk, q)
-        self.list_of_boundry_points.append(tmp_boundry)
+        self.list_of_boundry_geometry.append(tmp_boundry)
         self.number_of_boundry_geometry+=1
         print('sınır/boundry noktaları eklendi')
         # if len(x)>0: 
@@ -223,7 +228,7 @@ class PINN_2D:
         x,f,k,dk,q=geo.get_value(condition)
         tmp_body=points_2D(fcn,color)
         tmp_body.add_points(x, f, k, dk, q)
-        self.list_of_body_points.append(tmp_body)
+        self.list_of_body_geometry.append(tmp_body)
         self.number_of_body_geometry+=1
         print('govde/body noktaları eklendi')
         # x,f,k,dk,q=geo.get_value(ids)
@@ -237,9 +242,17 @@ class PINN_2D:
         # else: 
         #     print('veri aktarılırken bir hata oluştu')
  
+    def add_jump_geometry(self,geo,fcn,condition,par,n,color='.k'):# Gövde üzerindeki noktaları listeye kaydet 
+        x,f,k,dk,q=geo.get_value(condition)
+        tmp_jump=points_2D(fcn,color)
+        tmp_jump.add_points(x, f, k, dk, q,par=par,nn=n)
+        self.list_of_jump_geometry.append(tmp_jump)
+        self.number_of_jump_geometry+=1
+        print('govde/jump noktaları eklendi')
+        
     def get_boundry_loss(self): # Sınır bölgelerinde hata değerlerini hesapla 
         total_loss=tf.zeros([1,])
-        for boundry_points in self.list_of_boundry_points: # 
+        for boundry_points in self.list_of_boundry_geometry: # 
             # X=tf.Variable(tf.reshape(bp.X[:,0],[-1,1]))
             # Y=tf.Variable(tf.reshape(bp.X[:,1],[-1,1]))
             with tf.GradientTape(persistent=True) as tape_u:
@@ -274,7 +287,7 @@ class PINN_2D:
     
     def get_body_loss(self): # Diferansiyel hatalarını hesapla 
         total_loss=tf.zeros([1,])
-        for body_points in self.list_of_body_points: # 
+        for body_points in self.list_of_body_geometry: # 
             # X=tf.Variable(tf.reshape(body_points.X[:,0],[-1,1]))
             # Y=tf.Variable(tf.reshape(body_points.X[:,1],[-1,1]))
             
@@ -307,7 +320,28 @@ class PINN_2D:
             del tape_u
         return total_loss
     
-
+    def get_jump_loss(self): # Diferansiyel hatalarını hesapla 
+        total_loss=tf.zeros([1,])
+        for jump_points in self.list_of_jump_geometry: # 
+            with tf.GradientTape(persistent=True) as tape_u:
+                r=tf.concat((jump_points.X,jump_points.Y), axis=1)
+                #tape_u.watch(boundry_points.X)
+                U = self.model(r,training=True)
+                U_x = tape_u.gradient(U, jump_points.X)
+                U_y = tape_u.gradient(U, jump_points.Y)
+            # if self.usePoly:
+            #     Fp_=self.Poly.predict(boundry_points.X,'f')
+            #     Fp_x=self.Poly.predict(boundry_points.X,'fx')
+            #     U+=tf.reshape(Fp_, U.shape)
+            #     U_x +=tf.reshape(Fp_x, U_x.shape)
+            #print('NN:',prediction_of_boundry.shape,'poly:',Fp.shape)
+            loss_on_jump=jump_points.fcn(jump_points,[[U],[U_x,U_y]])
+            loss_jump=loss_func_with_err(loss_on_jump,self.err_type)
+            total_loss=total_loss+loss_jump
+            del tape_u
+            
+        return total_loss
+    
     def get_random_parameters(self,parameters,use=True):# Eğitim aşamasında rasgele parametre eğitmek için kullanılıyor 
         par_list=[]
         for w in parameters:
@@ -321,18 +355,23 @@ class PINN_2D:
             par_list.append(random_par*w)
         return par_list
     
-    def train(self,epoch,lr=0.0001,num=100,c=[0.5,0.5],errType='rmse',usePoly=False): # PINN katsayılarını eğit 
+    def train(self,epoch,lr=0.0001,num=100,c=[0.1,0.4,0.6],errType='rmse',usePoly=False,reset=True,title='training'): # PINN katsayılarını eğit 
         self.usePoly=usePoly
         self.err_type=errType
-        self.log=np.zeros([epoch,4])
-        for body_points in self.list_of_body_points:
+        if reset: 
+            self.log=np.zeros([1,5])
+        log=np.zeros([epoch,5])
+        for body_points in self.list_of_body_geometry:
             if not body_points.isTensor:
                 body_points.convert_tensor(self.model.dtype)
                 
-        for boundry_points in self.list_of_boundry_points:
+        for boundry_points in self.list_of_boundry_geometry:
             if not boundry_points.isTensor:
                 boundry_points.convert_tensor(self.model.dtype)
-                
+            
+        for jump_points in self.list_of_jump_geometry:
+            if not jump_points.isTensor:
+                jump_points.convert_tensor(self.model.dtype)
 
         optimizer=tf.optimizers.Adam(learning_rate =lr, 
                              beta_1 = 0.75, beta_2 = 0.999, epsilon = 1e-8)
@@ -345,20 +384,27 @@ class PINN_2D:
                 #tape.watch(trainable_variables) #self.model.trainable_variables[2].value
                 loss_boundry=self.get_boundry_loss()
                 loss_body=self.get_body_loss()
-                loss=c[0]*loss_boundry+c[1]*loss_body
+                loss_jump=self.get_jump_loss()
+                loss=c[0]*loss_boundry+c[1]*loss_body+c[2]*loss_jump
             dW=tape.gradient(loss, self.model.trainable_variables)
             ddW=self.get_random_parameters(dW)
-            optimizer.apply_gradients(zip(ddW, self.model.trainable_variables))
+            optimizer.apply_gradients(zip(dW, self.model.trainable_variables))
             #np_variables2 = [v.numpy() for v in trainable_variables]
-            self.log[i,:]=[i,loss_boundry[0].numpy(),loss_body[0].numpy(),loss[0].numpy()]
+            log[i,:]=[i+self.log[-1,0],loss_boundry[0].numpy(),loss_body[0].numpy(),loss_jump[0].numpy(),loss[0].numpy()]
             if i % num==0 or i<10: 
-                print(i,'\n lbound:',loss_boundry.numpy(),
-                      '\n lbody:',loss_body.numpy(),'\n loss:',loss.numpy())
+                print('itr:',i+self.log[-1,0],'  sub itr:',i,'  ',title,'\n lbound:',loss_boundry.numpy(),
+                      '\n lbody:',loss_body.numpy(),
+                      '\n ljump:',loss_jump.numpy(),
+                      '\n loss:',loss.numpy(),'\n \n')
                 
             if loss.numpy()<self.limit_of_error:
                 print('çözüme ulaşıldı l:',loss)
                 break 
         self.SIM_time=t.time()-self.t0
+        if reset: 
+            self.log=log
+        else: 
+            self.log=np.concatenate((self.log, log))
         print('PINN simulation time : ',self.SIM_time)
         
     def predict(self,x,y):
@@ -408,10 +454,12 @@ class PINN_2D:
         
     def plot_points_values_2D(self,figNo,subNo, color=None):
         plot_list=[]
-        for bp in self.list_of_boundry_points: 
+        for bp in self.list_of_boundry_geometry: 
             plot_list.append((bp.np_x,bp.np_y,bp.color))
-        for bp in self.list_of_body_points: 
+        for bp in self.list_of_body_geometry: 
             plot_list.append((bp.np_x,bp.np_y,bp.color))
+        for jp in self.list_of_jump_geometry: 
+            plot_list.append((jp.np_x,jp.np_y,jp.color))
             #plot_points(figNo,221,bp.np_x[:,0],bp.np_x[:,1],'xb','noktalar')
         # plot_surf_2D(figNo,222,self.X2D,self.Y2D,self.F2D-np.ones_like(self.F2D),'funksiyon')
         # plot_surf_2D(figNo,223,self.X2D,self.Y2D,self.par2D,'parametre')
