@@ -181,11 +181,24 @@ class points_2D:
         self.np_k=[]
         self.np_dk=[]
         self.np_q=[]
+        self.np_par=[]
+        self.np_n=[]
         self.color=color
         self.point_count=0
         self.isTensor=False
         
-    def add_points(self,x,f,k,dk,q):
+    def add_points(self,x,f,k,dk,q,par=[0],nn=[0]):
+        self.L=len(x)
+        if len(par)<2:
+            k2=np.zeros_like(k)
+            n=np.zeros([self.L,2],dtype=k.dtype)
+        else:
+            k=np.ones_like(k)*par[0]
+            k2=np.ones_like(k)*par[1]
+            n=np.ones([self.L,2],dtype=k.dtype)
+            n[:,0]=n[:,0]*nn[0]
+            n[:,1]=n[:,1]*nn[1]
+            
         if self.point_count==0: 
             self.np_x=np.reshape(x[:,0], [-1,1])
             self.np_y=np.reshape(x[:,1], [-1,1])
@@ -194,6 +207,8 @@ class points_2D:
             self.np_dk_dx=np.reshape(dk[:,0], [-1,1])
             self.np_dk_dy=np.reshape(dk[:,1], [-1,1])
             self.np_q=q
+            self.np_k2=k2
+            self.np_n=n
         else: 
             self.np_x=np.concatenate((self.np_x, np.reshape(x[:,0], [-1,1])),axis=0)
             self.np_y=np.concatenate((self.np_y, np.reshape(x[:,1], [-1,1])),axis=0)
@@ -202,6 +217,8 @@ class points_2D:
             self.np_dk_dx=np.concatenate((self.np_dk_dx, np.reshape(dk[:,0], [-1,1])),axis=0)
             self.np_dk_dy=np.concatenate((self.np_dk_dy, np.reshape(dk[:,1], [-1,1])),axis=0)
             self.np_q=np.concatenate((self.np_q, q),axis=0)
+            self.np_q=np.concatenate((self.np_k2, k2),axis=0)
+            self.np_q=np.concatenate((self.np_n, n),axis=0)
             
         self.point_count+=len(self.np_x[:,0])
         
@@ -213,6 +230,9 @@ class points_2D:
         self.dk_dx=tf.convert_to_tensor(self.np_dk_dx,dtype=dType)
         self.dk_dy=tf.convert_to_tensor(self.np_dk_dy,dtype=dType)
         self.q=tf.convert_to_tensor(self.np_q,dtype=dType)
+        self.k2=tf.convert_to_tensor(self.np_k2,dtype=dType)
+        self.nx=tf.convert_to_tensor(np.reshape(self.np_n[:,0],[-1,1]),dtype=dType)
+        self.ny=tf.convert_to_tensor(np.reshape(self.np_n[:,1],[-1,1]),dtype=dType)
         self.isTensor=True
                 
 class GEOMETRY_1D:

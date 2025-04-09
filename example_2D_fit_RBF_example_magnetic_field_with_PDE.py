@@ -31,8 +31,8 @@ f0=1/M0
 f1=1/M1
 J=N*I/(Am)#/Jmax; # Boyutsuz akı
 
-center_points=21
-FDA_points=2*(center_points-1)+1
+center_points=15
+FDA_points=3*(center_points-1)+1
 
 # Geometri tanımlama işlemleri  
 geo=GEOMETRY_2D([0,0],[L,L],f0,n=[FDA_points,FDA_points])
@@ -42,12 +42,12 @@ geo.set_function_value(Ax1, lambda x,y: x==L,Type='f')
 geo.set_function_value(Ay0, lambda x,y: 0<x<L and y==0,Type='f')
 geo.set_function_value(Ay1, lambda x,y: 0<x<L and y==L,Type='f')
 
-geo.set_function_value(J, lambda x,y: 0.4<=x<=0.6 and 0.4<=y<=0.6,Type='q')
+geo.set_function_value(J, lambda x,y: 0.4<=x<=0.6 and 0.3<=y<=0.5,Type='q')
 geo_copy=geo.copy()
 
-geo.set_function_value(f1, lambda x,y: 0.1<=x<=0.30 and 0.35<=y<=0.65,Type='p')
-geo.set_function_value(f1, lambda x,y: 0.7<=x<=0.90 and 0.35<=y<=0.65,Type='p')
-geo.set_function_value(f1, lambda x,y: 0.1<=x<=0.90 and 0.7<=y<=0.8,Type='p')
+geo.set_function_value(f1, lambda x,y: 0.1<=x<=0.30 and 0.25<=y<=0.55,Type='p')
+geo.set_function_value(f1, lambda x,y: 0.7<=x<=0.90 and 0.25<=y<=0.55,Type='p')
+geo.set_function_value(f1, lambda x,y: 0.1<=x<=0.90 and 0.6<=y<=0.9,Type='p')
 
 # geo.set_function_value((f1+f0)/2, lambda x,y: x==0.1 and 0.35<=y<=0.65,Type='p')
 # geo.set_function_value((f1+f0)/2, lambda x,y: x==0.30 and 0.35<=y<=0.65,Type='p')
@@ -123,7 +123,7 @@ FDAgs=FDA_2D(geo,pde_Maxwels_equation_2D) # gauss - sider iterasyonu sonlu farkl
 # FDAgs.set_more_calculation_area('x0') # x=0 da simetri koşulu dT/dx=0 
 
 # FDAgs.apply_FDA(500)
-FDAgs.apply_FDA_with_gauss_sider(50,lamda=0.99)
+FDAgs.apply_FDA_with_gauss_sider(100,lamda=0.99)
 FDAgs.resoult_FDA.plot_function_values_2D(2,color='-g')
 # F2Dgs=FDAgs.resoult_FDA.F2D
 Bgs=FDAgs.apply_cross_product()
@@ -142,11 +142,11 @@ FDA=FDAgs
 
 ## Buradan sonra Polinom Kollokasyonu Uygulanacak 
 Coll_RBF2D=collocation_2D(par=['mquad'],Type='rbf')
-Coll_RBF2D.FCN.set_function_type('eUzal') # gauss mquad  iquad imquad eUzal
+Coll_RBF2D.FCN.set_function_type('gauss') # gauss mquad  iquad imquad eUzal
 
 # Kollokasyon noktalarını tanımla
-# geo_center_points=GEOMETRY_2D([0,0],[L,L],f0,n=[center_points,center_points])
-geo_center_points=GEOMETRY_2D([0,0],[L,L],f0,n=[5,5])
+geo_center_points=GEOMETRY_2D([0,0],[L,L],f0,n=[center_points,center_points])
+# geo_center_points=GEOMETRY_2D([0,0],[L,L],f0,n=[5,5])
 
 geo_center_points.get_derivative_of_par()
 
@@ -183,6 +183,19 @@ def fcn_PDE(geo,model): # U=[[U],[dU/dx,dU/dy], [d2U/dx2,d2U/dxdy,d2U/dy2]]
     Resoults=geo.q
     return Matrix,Resoults
 
+def fcn_jump(geo,model):  # x=L, y=0, y=L ==> T=0 
+# curl(A) U_y i -U_x
+    Ux=model.get_matrix(geo.X,geo.Y,der='fx')
+    Uy=model.get_matrix(geo.X,geo.Y,der='fy')
+    Dk=(geo.k-geo.k2)*model.Ir
+    ax=(geo.nx*model.Ir)
+    ay=(geo.ny*model.Ir)
+    #Matrix=Dk*(ax*Ux+ay*Uy)
+    Matrix=Dk*(Uy*ax-Ux*ay)
+    Resoults=tf.zeros_like(geo.F)
+    return Matrix,Resoults
+
+
 # Sınır koşullarını belirle 
 cond_boundry_x0=lambda x,y: x==0
 cond_boundry_xL=lambda x,y: x==L
@@ -196,10 +209,52 @@ Coll_RBF2D.add_boundry(FDA.resoult_FDA,fcn_boundry,cond_boundry_yL) # y=L için 
 print('boundry count',Coll_RBF2D.number_of_boundry_geometry)
 
 # Gövdeleri belirle 
-cond_body=lambda x,y: x>0 and x<L and y>0 and y<L
-Coll_RBF2D.add_body(geo,fcn_PDE,cond_body) # y=L için bütün noktalar 
+# cond_body=lambda x,y: x>0 and x<L and y>0 and y<L
+
+cond_body0=lambda x,y: ((0<x<L and 0<y<L) and not (0.1<=x<=0.3 and 0.25<=y<=0.55) and not (0.7<=x<=0.9 and 0.25<=y<=0.55) and not (0.1<=x<=0.9 and 0.6<=y<=0.9) and not (0.4<=x<=0.6 and 0.3<=y<=0.5))
+cond_body1=lambda x,y: ((0<x<L and 0<y<L) and ((0.12<x<0.28 and 0.27<y<0.53) or (0.72<x<0.88 and 0.28<y<0.53) or (0.12<x<0.88 and 0.62<y<0.88) ))
+cond_coil=lambda x,y: ((0<x<L and 0<y<L) and (0.4<=x<=0.6 and 0.3<=y<=0.5))
+
+Coll_RBF2D.add_body(geo,fcn_PDE,cond_body0,color='.b') # y=L için bütün noktalar
+Coll_RBF2D.add_body(geo,fcn_PDE,cond_body1,color='.k') # y=L için bütün noktalar 
+Coll_RBF2D.add_body(geo,fcn_PDE,cond_coil,color='.y') # y=L için bütün noktalar 
+# Coll_RBF2D.add_body(geo,fcn_PDE,cond_body3) # y=L için bütün noktalar 
+# Coll_RBF2D.add_body(geo,fcn_PDE,cond_body4) # y=L için bütün noktalar 
 print('body count',Coll_RBF2D.number_of_body_geometry)
 
+
+cond_jump1_x=lambda x,y: ((0.09<x<0.11 and 0.26<y<0.53) or (0.29<x<0.31 and 0.26<y<0.53) )
+cond_jump1_y=lambda x,y: ((0.11<x<0.28 and 0.23<y<0.26) or (0.11<x<0.28 and 0.53<y<0.57) )
+cond_jump2_x=lambda x,y: ((0.68<x<0.72 and 0.26<y<0.53) or (0.89<x<0.91 and 0.26<y<0.53) )
+cond_jump2_y=lambda x,y: ((0.72<x<0.86 and 0.23<y<0.26) or (0.72<x<0.88 and 0.53<y<0.57) )
+cond_jump3_x=lambda x,y: ((0.08<x<0.12 and 0.72<y<0.87) or (0.88<x<0.91 and 0.62<y<0.87) )
+cond_jump3_y=lambda x,y: ((0.12<x<0.86 and 0.68<y<0.72) or (0.12<x<0.88 and 0.88<y<0.92) )
+
+
+
+Coll_RBF2D.add_jump_geometry(geo,fcn_jump,cond_jump1_x,[f0,f1],[-1,0],color='sk')
+Coll_RBF2D.add_jump_geometry(geo,fcn_jump,cond_jump1_y,[f0,f1],[0,-1],color='sk')
+Coll_RBF2D.add_jump_geometry(geo,fcn_jump,cond_jump2_x,[f0,f1],[-1,0],color='sk')
+Coll_RBF2D.add_jump_geometry(geo,fcn_jump,cond_jump2_y,[f0,f1],[0,-1],color='sk')
+Coll_RBF2D.add_jump_geometry(geo,fcn_jump,cond_jump3_x,[f0,f1],[-1,0],color='sk')
+Coll_RBF2D.add_jump_geometry(geo,fcn_jump,cond_jump3_y,[f0,f1],[0,-1],color='sk')
+
+#Coll_RBF2D.add_jump_geometry(geo,fcn_jump,cond_jump_x0,[f0,f1],[1,0],color='sb')
+
+print('jump count',Coll_RBF2D.list_of_jump_geometry)
+
+# plot_points(1,111,Coll_RBF2D.list_of_body_geometry[0].np_x,Coll_RBF2D.list_of_body_geometry[0].np_y,color='.k')
+# plot_points(1,111,Coll_RBF2D.list_of_body_geometry[1].np_x,Coll_RBF2D.list_of_body_geometry[1].np_y,color='.b')
+# plot_list_points(1,111,[(Coll_RBF2D.list_of_body_geometry[0].np_x,Coll_RBF2D.list_of_body_geometry[0].np_y,'.k'),
+#                         (Coll_RBF2D.list_of_body_geometry[1].np_x,Coll_RBF2D.list_of_body_geometry[1].np_y,'.b'),
+#                         (Coll_RBF2D.list_of_jump_geometry[0].np_x,Coll_RBF2D.list_of_jump_geometry[0].np_y,'sb'),
+#                         (Coll_RBF2D.list_of_jump_geometry[1].np_x,Coll_RBF2D.list_of_jump_geometry[1].np_y,'sb'),
+#                         (Coll_RBF2D.list_of_jump_geometry[2].np_x,Coll_RBF2D.list_of_jump_geometry[2].np_y,'sg'),
+#                         (Coll_RBF2D.list_of_jump_geometry[3].np_x,Coll_RBF2D.list_of_jump_geometry[3].np_y,'sg'),
+#                         (Coll_RBF2D.list_of_jump_geometry[4].np_x,Coll_RBF2D.list_of_jump_geometry[4].np_y,'sy'),
+#                         (Coll_RBF2D.list_of_jump_geometry[5].np_x,Coll_RBF2D.list_of_jump_geometry[5].np_y,'sy')])
+
+pp=Coll_RBF2D.list_of_body_geometry[0]
 
 # Kollokasyon uygulama 
 Coll_RBF2D.apply_collocation()
@@ -215,48 +270,58 @@ Coll_RBF2D.plot_function(7, 232, XX, YY)
 Coll_RBF2D.plot_stream_line(7, 235, XX, YY)
 Coll_RBF2D.plot_curl_2D(8, XX, YY)
 
+Coll_RBF2D.FCN.C=tf.abs(Coll_RBF2D.FCN.C)
+  
+
 
 # Model non-lineer parameter optimization 
 C_first=Coll_RBF2D.FCN.C
 # Coll_RBF2D.FCN.set_tranible_parameters(Xm=True,Ym=True,Ex=False,Ey=False,C=False)
 # Coll_RBF2D.train(250,lr=0.005,c=[0.1,0.9],num=10,errType='rmse') # 100 iterasyon koşur 
 # Coll_RBF2D.apply_collocation()
+
+oran=[0.1,0.4,0.75]
 Coll_RBF2D.FCN.set_tranible_parameters(Xm=False,Ym=False,Ex=True,Ey=True,C=False)
-Coll_RBF2D.train(2,lr=0.001,c=[0.1,0.9],num=10,errType='rmse',reset=True,title='shape parameters') # 100 iterasyon koşur 
+Coll_RBF2D.train(500,lr=0.1,c=oran,num=10,errType='rmse',reset=True,title='shape parameters') # 100 iterasyon koşur 
 
-for i in range(5):
-    Coll_RBF2D.error_analysis_on_geometry(geo,fcn_PDE,9)
+Coll_RBF2D.train(200,lr=0.05,c=oran,num=10,errType='rmse',reset=True,title='shape parameters') # 100 iterasyon koşur 
 
-    # Coll_RBF2D.FCN.set_tranible_parameters(Xm=False,Ym=False,Ex=True,Ey=True,C=False)
-    # Coll_RBF2D.train(10,lr=0.001,c=[0.1,0.9],num=10,errType='mse',reset=False,title='shape parameters') # 100 iterasyon koşur 
+
+
+for i in range(10):
+    # Coll_RBF2D.error_analysis_on_geometry(geo,fcn_PDE,9)
+
+    Coll_RBF2D.FCN.set_tranible_parameters(Xm=False,Ym=False,Ex=True,Ey=True,C=False)
+    Coll_RBF2D.train(100,lr=0.01,c=oran,num=10,errType='rse',reset=False,title='shape parameters') # 100 iterasyon koşur 
     
     # Coll_RBF2D.FCN.set_tranible_parameters(Xm=True,Ym=True,Ex=False,Ey=False,C=False)
-    # Coll_RBF2D.train(10,lr=0.001,c=[0.1,0.9],num=10,errType='rmse',reset=False,title='center points') # 100 iterasyon koşur 
-    # # Coll_RBF2D.apply_collocation()
+    # Coll_RBF2D.train(100,lr=1e-2,c=oran,num=10,errType='mse',reset=False,title='center points') # 100 iterasyon koşur 
+    # # # Coll_RBF2D.apply_collocation()
     
     Coll_RBF2D.FCN.set_tranible_parameters(Xm=False,Ym=False,Ex=False,Ey=False,C=True)
-    Coll_RBF2D.train(10,lr=0.00001,c=[0.1,0.9],num=10,errType='rmse',reset=False,title='weights') # 100 iterasyon koşur 
+    Coll_RBF2D.train(100,lr=1e-7,c=oran,num=10,errType='rse',reset=False,title='weights') # 100 iterasyon koşur 
     # Coll_RBF2D.apply_collocation()
     
+
 
 Tvars=Coll_RBF2D.FCN.trainable_variables
 
 # Coll_RBF2D.train(500,lr=0.001,c=[0.5,0.5],num=10,errType='mse') # 100 iterasyon koşur 
 C_last=Coll_RBF2D.FCN.C
-# C_=np.concatenate((C_first, C_last),axis=1)
+C_=np.concatenate((C_first, C_last),axis=1)
+E=np.concatenate((Coll_RBF2D.FCN.Ex.numpy(),Coll_RBF2D.FCN.Ey.numpy()),axis=0)
 
 Coll_RBF2D.plot_function(7, 233, XX, YY)
 Coll_RBF2D.plot_stream_line(7, 236, XX, YY)
 Coll_RBF2D.plot_curl_2D(9, XX, YY)
-"""  
-"""
-# Coll_RBF2D.plot_log(10)
+Coll_RBF2D.plot_log(10)
 
 CC=Coll_RBF2D.FCN.C.numpy()
 CCex=Coll_RBF2D.FCN.Ex.numpy()
 CCey=Coll_RBF2D.FCN.Ey.numpy()
 
 """
+"""
 
-
+"""
 """

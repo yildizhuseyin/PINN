@@ -265,8 +265,11 @@ class collocation_2D:
         self.dtype=dtype
         self.list_of_boundry_geometry=[]
         self.list_of_body_geometry=[]
+        self.list_of_jump_geometry=[]
         self.number_of_boundry_geometry=0 
         self.number_of_body_geometry=0
+        self.number_of_jump_geometry=0
+
         self.err_type=errType
         self.limit_of_error=1e-12
         #self.usePoly=False
@@ -286,6 +289,14 @@ class collocation_2D:
         self.list_of_body_geometry.append(tmp_body)
         self.number_of_body_geometry+=1
         print('govde/body noktaları eklendi')
+        
+    def add_jump_geometry(self,geo,fcn,condition,par,n,color='.k'):# Gövde üzerindeki noktaları listeye kaydet 
+        x,f,k,dk,q=geo.get_value(condition)
+        tmp_jump=points_2D(fcn,color)
+        tmp_jump.add_points(x, f, k, dk, q,par=par,nn=n)
+        self.list_of_jump_geometry.append(tmp_jump)
+        self.number_of_jump_geometry+=1
+        print('govde/jump noktaları eklendi')
     
     def RBF_add_center_point_with_points(self,xm,ym,ex,ey):# Gövde üzerindeki noktaları merkez nokta olarak ekle 
         if self.Type=='rbf':    
@@ -320,6 +331,17 @@ class collocation_2D:
                 tmpM,tmpB=bp.fcn_m(bp,self.FCN)
                 M=tf.concat((M,tmpM),axis=0)
                 B=tf.concat((B,tmpB),axis=0)
+            say+=1
+        
+        for jp in self.list_of_jump_geometry:
+            if not jp.isTensor:
+                jp.convert_tensor(self.dtype)
+            if say==0 :
+                M,B=jp.fcn_m(jp,self.FCN)
+            else: 
+                tmpM,tmpB=jp.fcn_m(jp,self.FCN)
+                M=1*tf.concat((M,tmpM),axis=0)
+                B=1*tf.concat((B,tmpB),axis=0)
             say+=1 
         tmpC=tf_linsolve(M,B)
         self.FCN.C=tmpC
@@ -343,6 +365,15 @@ class collocation_2D:
             loss_body=loss_Func(preditction,tmpB,self.err_type)
             total_loss=total_loss+loss_body
         return total_loss
+    
+    def get_jump_loss(self): # Diferansiyel hatalarını hesapla 
+        total_loss=tf.zeros([1,],dtype=self.FCN.dtype)
+        for jump_points in self.list_of_jump_geometry: # 
+            tmpM,tmpB=jump_points.fcn_m(jump_points,self.FCN)
+            preditction=tf.matmul(tmpM, self.FCN.C)
+            loss_body=loss_Func(preditction,tmpB,self.err_type)
+            total_loss=total_loss+loss_body
+        return total_loss
         
     def get_random_parameters(self,parameters,use=True):# Eğitim aşamasında rasgele parametre eğitmek için kullanılıyor 
         par_list=[]
@@ -357,7 +388,7 @@ class collocation_2D:
             par_list.append(random_par*w)
         return par_list
     
-    def train(self,epoch,lr=0.0001,num=100,c=[0.5,0.5],errType='rmse',usePoly=False,reset=True,title='training'): # PINN katsayılarını eğit 
+    def train(self,epoch,lr=0.0001,num=100,c=[0.25,0.25,0.5],errType='rmse',usePoly=False,reset=True,title='training'): # PINN katsayılarını eğit 
         self.usePoly=usePoly
         self.err_type=errType
         
@@ -372,6 +403,10 @@ class collocation_2D:
         for boundry_points in self.list_of_boundry_geometry:
             if not boundry_points.isTensor:
                 boundry_points.convert_tensor(self.FCN.dtype)
+            
+        for jump_points in self.list_of_jump_geometry:
+            if not jump_points.isTensor:
+                jump_points.convert_tensor(self.FCN.dtype)
                 
         optimizer=tf.optimizers.Adam(learning_rate =lr, 
                              beta_1 = 0.75, beta_2 = 0.999, epsilon = 1e-8)
@@ -384,7 +419,8 @@ class collocation_2D:
                 #tape.watch(trainable_variables) #self.model.trainable_variables[2].value
                 loss_boundry=self.get_boundry_loss()
                 loss_body=self.get_body_loss()
-                loss=c[0]*loss_boundry+c[1]*loss_body
+                loss_jump=self.get_jump_loss()
+                loss=c[0]*loss_boundry+c[1]*loss_body+c[2]*loss_jump
             dW=tape.gradient(loss, self.FCN.trainable_variables)
             ddW=self.get_random_parameters(dW)
             optimizer.apply_gradients(zip(ddW, self.FCN.trainable_variables))
@@ -392,7 +428,9 @@ class collocation_2D:
             log[i,:]=[i+self.log[-1,0],loss_boundry[0].numpy(),loss_body[0].numpy(),loss[0].numpy()]
             if i % num==0 or i<10: 
                 print('itr:',i+self.log[-1,0],'  sub itr:',i,'  ',title,'\n lbound:',loss_boundry.numpy(),
-                      '\n lbody:',loss_body.numpy(),'\n loss:',loss.numpy(),'\n \n')
+                      '\n lbody:',loss_body.numpy(),
+                      '\n ljump:',loss_jump.numpy(),
+                      '\n loss:',loss.numpy(),'\n \n')
                 
             if loss.numpy()<self.limit_of_error:
                 print('çözüme ulaşıldı l:',loss)
@@ -519,13 +557,12 @@ class collocation_2D:
         plot_list=[]
         if self.Type=='rbf':
             plot_list.append((self.FCN.Xm.numpy(),self.FCN.Ym.numpy(),self.FCN.color))
-            
         for bp in self.list_of_boundry_geometry: 
             plot_list.append((bp.np_x,bp.np_y,bp.color))
         for bp in self.list_of_body_geometry: 
             plot_list.append((bp.np_x,bp.np_y,bp.color))
-        
-        
+        for jp in self.list_of_jump_geometry: 
+            plot_list.append((jp.np_x,jp.np_y,jp.color))
         plot_list_points(figNo,subNo,plot_list,'noktalar')
     
     def plot_curl_2D(self,figNo,x2D,y2D,color=None):
